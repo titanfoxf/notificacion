@@ -540,45 +540,68 @@ select.styled-select option {
     display: none !important;
 }
 
-/* Caja Eje Vertical (Norte / Sur) */
+/* Caja Eje Vertical (Norte / Sur) - Ultra Delgada */
 .axis-vertical-box {
     background: rgba(16, 25, 46, 0.92);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 14px;
-    padding: 10px 8px;
+    padding: 8px 6px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+    width: fit-content;
+}
+
+.axis-v-content {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 5px;
+}
+
+.axis-name-vertical {
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    font-size: 9px;
+    font-weight: 800;
+    color: var(--text-muted);
+    letter-spacing: 1.2px;
+    white-space: nowrap;
+    text-transform: uppercase;
+    user-select: none;
+    opacity: 0.85;
+    line-height: 1;
 }
 
 .slider-vertical-wrap {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
 }
 
 .axis-limit-top,
 .axis-limit-bottom {
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 800;
     color: #38bdf8;
     font-family: monospace;
+    line-height: 1;
 }
 
 /* Slider Vertical estilizado */
 .slider-vertical {
     writing-mode: vertical-lr;
     direction: rtl;
-    width: 24px;
-    height: 150px;
+    width: 22px;
+    height: 140px;
     accent-color: #10b981;
     cursor: pointer;
-    margin: 4px 0;
+    margin: 2px 0;
 }
 
 /* Caja Eje Horizontal (Este / Oeste) */
