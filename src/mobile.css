@@ -1,0 +1,151 @@
+/* src/mobile.css - Ajustes responsive para dispositivos móviles y celulares */
+
+#sidebar.hidden-sidebar { 
+    margin-left: -380px; 
+}
+
+#btn-toggle-sidebar {
+    display: flex; /* Visible tanto en escritorio como en móviles para control total */
+}
+
+.btn-close-sidebar-mobile {
+    display: none;
+}
+
+/* Telón de fondo oscuro para dispositivos móviles */
+.sidebar-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    background: rgba(4, 7, 16, 0.72);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    z-index: 2050;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.sidebar-backdrop.active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+@media (max-width: 900px) {
+    #btn-toggle-sidebar {
+        display: flex;
+    }
+
+    .btn-close-sidebar-mobile {
+        display: flex;
+        position: absolute;
+        top: 0px;
+        right: 0px;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--glass-border);
+        color: var(--text-muted);
+        font-size: 16px;
+        font-weight: 700;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        cursor: pointer;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        z-index: 10;
+    }
+
+    .btn-close-sidebar-mobile:hover {
+        color: #fff;
+        background: rgba(239, 68, 68, 0.3);
+        border-color: rgba(239, 68, 68, 0.5);
+    }
+
+    /* EN CELULARES Y TABLETS: BARRA LATERAL OCULTA POR DEFECTO PARA NO IMPEDIR LA NAVEGACIÓN */
+    #sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 86vw;
+        max-width: 360px;
+        height: 100vh;
+        height: 100dvh;
+        z-index: 2100;
+        background: rgba(10, 15, 29, 0.98);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        transform: translateX(-100%); /* OCULTO POR DEFECTO EN CELULARES */
+        margin-left: 0 !important;
+        padding: 14px 16px;
+        box-shadow: 10px 0 40px rgba(0, 0, 0, 0.85);
+        transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.32s ease;
+        visibility: hidden;
+        pointer-events: none;
+    }
+
+    /* Cuando el usuario presiona el botón ☰ */
+    #sidebar.sidebar-open {
+        transform: translateX(0);
+        visibility: visible;
+        pointer-events: auto;
+    }
+
+    #sidebar.hidden-sidebar {
+        transform: translateX(-100%);
+        visibility: hidden;
+        pointer-events: none;
+    }
+
+    .modal-content {
+        width: 95vw;
+        max-height: 92vh;
+    }
+
+    .modal-content.large-modal {
+        width: 96vw;
+        height: 92vh;
+    }
+
+    #float-opacity {
+        display: none;
+    }
+
+    #float-fine-tune {
+        left: 10px;
+        bottom: 10px;
+        width: 250px;
+        max-width: calc(100vw - 20px);
+    }
+}
+
+@media (max-width: 480px) {
+    #sidebar {
+        width: 90vw;
+        max-width: 340px;
+    }
+
+    .metrics-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+    
+    .info-grid {
+        grid-template-columns: 1fr;
+    }
+
+    #float-map-tools {
+        top: 10px;
+        right: 10px;
+    }
+
+    .map-tool-btn {
+        width: 38px;
+        height: 38px;
+        font-size: 16px;
+    }
+}

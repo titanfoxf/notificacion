@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor GIS Notificaciones - Subsector 1A-4 Promuvi</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+
+    <!-- Pantalla de Carga -->
+    <div id="loader" class="loading-screen">
+        <div class="spinner"></div>
+        <div style="font-weight: 700; font-size: 15px; color: #38bdf8; letter-spacing: 0.5px;">VISOR GIS PROMUVI 1A-4</div>
+        <div id="loader-text" style="font-size: 12px; color: #94a3b8;">Conectando con Google Sheets y cargando cartografía...</div>
+    </div>
+
+    <!-- Contenedor de Notificaciones Toast -->
+    <div id="toast-container"></div>
+
+    <!-- Telón / Backdrop para móviles -->
+    <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
+    <!-- Barra Lateral (Sidebar) -->
+    <div id="sidebar" class="glass-panel custom-scroll">
+        
+        <div class="sidebar-header">
+            <button id="btn-close-sidebar-mobile" class="btn-close-sidebar-mobile" title="Ocultar menú">✕</button>
+            <span class="sidebar-badge">Saneamiento y Titulación</span>
+            <h2>VISOR GIS NOTIFICAR</h2>
+            <small>SUBSECTOR 1A-4 • CHEN CHEN • MOQUEGUA</small>
+        </div>
+
+        <!-- Indicador de Sincronización con Google Sheets -->
+        <div class="sync-indicator">
+            <div class="sync-status">
+                <span class="sync-dot"></span>
+                <span id="sync-status-text">Google Sheets Sincronizado</span>
+            </div>
+            <button id="btn-sync-reload" class="btn-sync-refresh" title="Actualizar datos desde Google Sheets">🔄 Actualizar</button>
+        </div>
+
+        <!-- Botón de Reporte de Avance / Dashboard -->
+        <button id="btn-open-dashboard" class="btn-primary" style="background: linear-gradient(135deg, #38bdf8, #6366f1); margin-bottom: 12px; padding: 11px; font-weight: 800;">
+            📊 REPORTE & PADRÓN DE NOTIFICACIONES
+        </button>
+
+        <!-- Selector de Modo de Visualización -->
+        <div class="tool-section">
+            <label class="section-label">Modo Temático</label>
+            <select id="mode-selector" class="styled-select">
+                <option value="ESTADO">Por Estado de Notificación</option>
+                <option value="ASOCIACION">Por Asociación de Vivienda</option>
+                <option value="MASIVO">Búsqueda Masiva de Predios</option>
+            </select>
+        </div>
+
+        <!-- Búsqueda Rápida Normal -->
+        <div class="tool-section" id="box-busqueda-normal">
+            <label class="section-label">Búsqueda Rápida</label>
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Buscar Lote, Mz, DNI, Titular o Carpeta...">
+                <button id="btnSearch" class="btn-primary" style="padding: 9px 12px;">BUSCAR</button>
+            </div>
+            <div id="search-feedback" style="font-size: 11px; margin-top: 6px; display: none;"></div>
+        </div>
+
+        <!-- Búsqueda Masiva -->
+        <div class="tool-section hidden" id="box-busqueda-masiva">
+            <label class="section-label">Búsqueda Masiva (Códigos o DNI)</label>
+            <textarea id="batch-input" rows="4" class="styled-select" style="font-family: monospace; font-size: 11px;" placeholder="Pegue lista (uno por línea):&#10;1A-4_B_08&#10;72891024&#10;1A-4_C_03"></textarea>
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+                <button id="btnBatch" class="btn-primary" style="flex: 1.2; background: #f59e0b;">PROYECTAR</button>
+                <button id="btnBatchClear" class="btn-secondary" style="flex: 0.8;">LIMPIAR</button>
+            </div>
+            <div id="batch-results" style="margin-top: 8px; font-size: 11px; color: var(--accent); font-weight: 600;"></div>
+        </div>
+
+        <!-- Filtros Cartográficos por Estado -->
+        <div class="tool-section" id="box-filtros-estado">
+            <label class="section-label">
+                <span>Filtro de Estados</span>
+                <span id="total-notificar-badge" style="color: #38bdf8; font-size: 10px;">77 Notificables</span>
+            </label>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                
+                <!-- Toggle Solo en Padrón -->
+                <div class="chk-filter-container" style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25);">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; flex-grow: 1; margin: 0;">
+                        <input type="checkbox" id="chkOnlyNotificar" checked style="accent-color: #38bdf8;">
+                        <span style="font-weight: 700; font-size: 11px; color: #e0f2fe;">SOLO EN PADRÓN NOTIFICAR</span>
+                    </label>
+                    <span id="count-only-notificar" class="badge-counter" style="color: #38bdf8;">77</span>
+                </div>
+
+                <!-- Color Único Monocromático -->
+                <div class="chk-filter-container" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--glass-border);">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; flex-grow: 1; margin: 0;">
+                        <input type="checkbox" id="chkSingleColor">
+                        <span style="font-weight: 600; font-size: 11px; color: var(--text-main);">COLOR ÚNICO (TODOS)</span>
+                    </label>
+                    <input type="color" id="colorPickerSingle" value="#38bdf8" style="width: 22px; height: 22px; border: none; border-radius: 4px; background: transparent; cursor: pointer;" disabled>
+                </div>
+
+                <!-- Sin Carpeta -->
+                <div class="chk-filter-container" style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25);">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; flex-grow: 1; margin: 0;">
+                        <input type="checkbox" id="chkSinCarpeta" checked style="accent-color: var(--status-sin-carpeta);">
+                        <span style="font-weight: 700; font-size: 11px; color: #fef3c7;">SIN CARPETA</span>
+                    </label>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <input type="color" id="colorPickerSinCarpeta" value="#f59e0b" style="width: 20px; height: 20px; border: none; border-radius: 4px; background: transparent; cursor: pointer;">
+                        <span id="count-sin-carpeta" class="badge-counter" style="color: var(--status-sin-carpeta);">59</span>
+                    </div>
+                </div>
+
+                <!-- No Titulado -->
+                <div class="chk-filter-container" style="background: rgba(236, 72, 153, 0.08); border: 1px solid rgba(236, 72, 153, 0.25);">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; flex-grow: 1; margin: 0;">
+                        <input type="checkbox" id="chkNoTitulado" checked style="accent-color: var(--status-no-titulado);">
+                        <span style="font-weight: 700; font-size: 11px; color: #fce7f3;">NO TITULADO</span>
+                    </label>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <input type="color" id="colorPickerNoTitulado" value="#ec4899" style="width: 20px; height: 20px; border: none; border-radius: 4px; background: transparent; cursor: pointer;">
+                        <span id="count-no-titulado" class="badge-counter" style="color: var(--status-no-titulado);">18</span>
+                    </div>
+                </div>
+
+                <!-- Otros Predios del Sector 1A-4 -->
+                <div class="chk-filter-container" style="background: rgba(100, 116, 139, 0.08); border: 1px solid rgba(100, 116, 139, 0.25);">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; flex-grow: 1; margin: 0;">
+                        <input type="checkbox" id="chkOtrosPredios" style="accent-color: var(--status-otros);">
+                        <span style="font-weight: 600; font-size: 11px; color: #cbd5e1;">OTROS PREDIOS (1A-4)</span>
+                    </label>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <input type="color" id="colorPickerOtros" value="#64748b" style="width: 20px; height: 20px; border: none; border-radius: 4px; background: transparent; cursor: pointer;">
+                        <span id="count-otros" class="badge-counter" style="color: #94a3b8;">234</span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Filtros por Asociación de Vivienda -->
+        <div class="tool-section hidden" id="box-filtros-asociacion">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <label class="section-label" style="margin: 0;">Asociaciones</label>
+                <div style="display: flex; gap: 4px;">
+                    <button id="btn-asoc-all" class="btn-secondary" style="padding: 2px 6px; font-size: 9px;">Todas</button>
+                    <button id="btn-asoc-none" class="btn-secondary" style="padding: 2px 6px; font-size: 9px;">Ninguna</button>
+                </div>
+            </div>
+            <div id="asociaciones-list" class="custom-scroll" style="display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto;">
+                <!-- Poblado dinámicamente -->
+            </div>
+        </div>
+
+        <!-- SECCIÓN: FONDO CARTOGRÁFICO (Fondo 1, Fondo 2, Fondo 3) -->
+        <div class="tool-section expandable-section">
+            <button class="btn-expand" id="fondo-toggle">
+                <span>🗺️ Fondo Cartográfico</span>
+                <span id="fondo-arrow">▼</span>
+            </button>
+            <div id="fondo-panel" class="offset-panel">
+                <div style="display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                    <label style="color: #e2e8f0; font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                        <input type="radio" name="fondoOption" value="fondo1" checked style="accent-color: var(--accent);"> Fondo 1
+                    </label>
+                    <label id="lbl-fondo2" style="color: #e2e8f0; font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                        <input type="radio" name="fondoOption" value="fondo2" style="accent-color: var(--accent);"> Fondo 2
+                    </label>
+                    <label id="lbl-fondo3" style="color: #e2e8f0; font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                        <input type="radio" name="fondoOption" value="fondo3" style="accent-color: var(--accent);"> Fondo 3
+                    </label>
+                    <label style="color: #e2e8f0; font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                        <input type="radio" name="fondoOption" value="ninguno" style="accent-color: var(--accent);"> Ninguno
+                    </label>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; border-top: 1px solid var(--glass-border); padding-top: 8px;">
+                    <span style="color: var(--text-muted);">Opacidad Fondo:</span>
+                    <span id="val-fondo-opacidad" style="color: #00e5ff; font-weight: 700;">30%</span>
+                    <input type="range" id="sliderFondoOpacidad" min="0" max="100" value="30" style="width: 110px; accent-color: #00e5ff;">
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+                    <span style="color: var(--text-muted);">Color Contorno Fondo:</span>
+                    <input type="color" id="colorPickerFondo" value="#00e5ff" style="width: 24px; height: 24px; border: none; background: transparent; cursor: pointer;" title="Color del contorno de la capa de fondo">
+                </div>
+
+                <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 6px;">
+                    <label style="color: #e2e8f0; font-size: 11px; display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;" title="Permite hacer clic en la capa de fondo para consultar sus partidas registrales">
+                        <input type="checkbox" id="chkInfoFondo" checked style="accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer;"> Consultar datos de fondo al hacer clic
+                    </label>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Selección Espacial (Point in Polygon) -->
+        <div class="tool-section">
+            <label class="section-label">Selección Espacial en Mapa</label>
+            <div style="display: flex; gap: 6px;">
+                <button id="btnDrawStart" class="btn-primary" style="flex: 1.2; font-size: 11px; padding: 8px;">✏️ DIBUJAR ÁREA</button>
+                <button id="btnDrawFilter" class="btn-primary hidden" style="flex: 1; background: #10b981; font-size: 11px; padding: 8px;">✅ FILTRAR</button>
+                <button id="btnDrawClear" class="btn-secondary hidden" style="flex: 1; font-size: 11px; padding: 8px;">🧹 LIMPIAR</button>
+            </div>
+            <div id="draw-status" style="font-size: 10px; color: #34d399; margin-top: 6px; display: none; text-align: center; font-weight: 600;">
+                Haga clics en el mapa para añadir vértices del área.
+            </div>
+        </div>
+
+        <!-- Exportaciones Masivas -->
+        <div class="tool-section">
+            <label class="section-label">Exportar Cartografía & Padrón</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;">
+                <button id="btnExportCAD" class="btn-primary" style="background: #e11d48; font-size: 11px; padding: 8px 4px;" title="Descargar vectores en AutoCAD DXF (UTM 19S)">
+                    📐 CAD .DXF
+                </button>
+                <button id="btnExportKML" class="btn-primary" style="background: #059669; font-size: 11px; padding: 8px 4px;" title="Descargar capa para Google Earth con datos extendidos">
+                    🌍 KML
+                </button>
+                <button id="btnExportExcel" class="btn-primary" style="background: #15803d; font-size: 11px; padding: 8px 4px;" title="Descargar Padrón y Coordenadas en Excel">
+                    📗 EXCEL
+                </button>
+            </div>
+        </div>
+
+        <!-- Etiquetas (Leyendas) en Lotes -->
+        <div class="tool-section">
+            <label class="section-label">Etiquetas / Leyendas de Predio</label>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; cursor: pointer;">
+                    <input type="checkbox" id="chkShowLabels" checked style="accent-color: var(--accent);">
+                    <span>Mostrar Etiquetas en Lotes</span>
+                </label>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+                    <span style="color: var(--text-muted);">Texto a mostrar:</span>
+                    <select id="labelFieldSelect" class="styled-select" style="width: 180px; font-size: 11px; padding: 4px 6px;">
+                        <option value="COD_PROMUVI">Código Promuvi (Ej: 1A-4_B_08)</option>
+                        <option value="MZ_LOTE">Manzana y Lote (Ej: Mz B Lt 8)</option>
+                        <option value="ESTADO">Estado de Notificación</option>
+                        <option value="TITULAR">Nombre del Titular</option>
+                    </select>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+                    <span style="color: var(--text-muted);">Estilo de Texto:</span>
+                    <select id="labelStyleSelect" class="styled-select" style="width: 180px; font-size: 11px; padding: 4px 6px;">
+                        <option value="halo" selected>Texto Limpio con Halo (Sin Fondo)</option>
+                        <option value="pill">Badge Translúcido Suave</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estilos de Borde de Polígonos -->
+        <div class="tool-section">
+            <label class="section-label">Estilo de Polígonos</label>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+                    <span style="color: var(--text-muted);">Grosor de Borde:</span>
+                    <span id="val-stroke" style="color: var(--accent); font-weight: 700;">2 px</span>
+                    <input type="range" id="sliderStroke" min="1" max="5" value="2" step="0.5" style="width: 120px; accent-color: var(--accent);">
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+                    <span style="color: var(--text-muted);">Estilo de Trazo:</span>
+                    <select id="selectStrokeStyle" class="styled-select" style="width: 120px; padding: 4px; font-size: 11px;">
+                        <option value="solid">Sólido</option>
+                        <option value="dashed">Segmentado</option>
+                        <option value="dotted">Punteado</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Selector de Mapa Base -->
+        <div class="tool-section">
+            <label class="section-label">Mapa Base</label>
+            <select id="baseMapSelect" class="styled-select">
+                <option value="google-hybrid">Google Satélite Híbrido</option>
+                <option value="google-sat">Google Satélite Puro</option>
+                <option value="esri-sat">Esri World Imagery</option>
+                <option value="esri-dark">Esri Dark Canvas (Sin marca)</option>
+                <option value="osm">OpenStreetMap</option>
+                <option value="carto-dark">CartoDB Dark Matter</option>
+            </select>
+        </div>
+
+        <div style="text-align: center; margin-top: auto; padding-top: 12px; font-size: 10px; color: var(--text-dim);">
+            Subsector 1A-4 • Catastro Promuvi Moquegua
+        </div>
+    </div>
+
+    <!-- Contenedor del Mapa -->
+    <div id="map-container">
+        <!-- Floating Opacity Slider -->
+        <div id="float-opacity" class="float-panel">
+            <span style="color: var(--text-muted);">Opacidad:</span>
+            <input type="range" id="floatSliderOpacidad" min="0" max="100" value="60" style="width: 90px; accent-color: var(--accent);">
+            <span id="floatValOpacidad" style="color: var(--accent); min-width: 32px;">60%</span>
+        </div>
+
+        <!-- Floating Tool Buttons on Map -->
+        <div id="float-map-tools">
+            <button id="btn-toggle-sidebar" class="map-tool-btn" title="Mostrar/Ocultar Menú">☰</button>
+            <button id="btn-recenter" class="map-tool-btn" title="Centrar en Subsector 1A-4">🎯</button>
+            <button id="btn-toggle-labels-map" class="map-tool-btn active" title="Alternar Etiquetas">🏷️</button>
+            <button id="btn-open-help" class="map-tool-btn" title="Información y Ayuda">ℹ️</button>
+        </div>
+
+        <!-- Floating Fine Tune Widget on Map (Esquina inferior izquierda) -->
+        <div id="float-fine-tune" class="float-panel fine-tune-float">
+            <div class="fine-tune-header" id="fine-tune-header">
+                <div class="fine-tune-title-wrap">
+                    <span style="font-size: 13px;">🎯</span>
+                    <span class="fine-tune-title">Ajuste Fino</span>
+                    <span id="badge-offset-summary" class="offset-summary-badge">+0.0m, +0.0m</span>
+                </div>
+                <button id="btn-toggle-fine-tune" class="btn-icon-subtle" title="Minimizar / Expandir">▼</button>
+            </div>
+            
+            <div id="fine-tune-body" class="fine-tune-body">
+                <!-- Slider Este -->
+                <div class="fine-tune-row">
+                    <div class="fine-tune-label">
+                        <span>Este (+E / -W):</span>
+                        <span id="val-offset-e" class="valor-verde">+0.0 m</span>
+                    </div>
+                    <input type="range" id="offset-east" min="-25" max="25" step="0.1" value="0" class="fine-tune-slider">
+                </div>
+
+                <!-- Slider Norte -->
+                <div class="fine-tune-row">
+                    <div class="fine-tune-label">
+                        <span>Norte (+N / -S):</span>
+                        <span id="val-offset-n" class="valor-verde">+0.0 m</span>
+                    </div>
+                    <input type="range" id="offset-north" min="-25" max="25" step="0.1" value="0" class="fine-tune-slider">
+                </div>
+
+                <!-- Micro-Ajuste con Botones Rápidos (0.5m) -->
+                <div class="fine-tune-nudges">
+                    <button class="btn-secondary btn-nudge" data-dir="W" data-step="0.5" title="Mover Oeste 0.5m">◀ 0.5m</button>
+                    <button class="btn-secondary btn-nudge" data-dir="E" data-step="0.5" title="Mover Este 0.5m">▶ 0.5m</button>
+                    <button class="btn-secondary btn-nudge" data-dir="S" data-step="0.5" title="Mover Sur 0.5m">▼ 0.5m</button>
+                    <button class="btn-secondary btn-nudge" data-dir="N" data-step="0.5" title="Mover Norte 0.5m">▲ 0.5m</button>
+                </div>
+
+                <div style="display: flex; gap: 6px; margin-top: 4px;">
+                    <button id="offset-reset" class="btn-secondary" style="flex: 1; font-size: 11px; padding: 5px;" title="Restablecer calibración a 0.0m">Restablecer (0.0m)</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="map"></div>
+    </div>
+
+    <!-- Modal Detalle del Predio -->
+    <div id="property-modal" class="glass-modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Ficha Técnica de Notificación</h3>
+                <button id="btn-close-prop-modal" class="btn-close">×</button>
+            </div>
+            <div class="modal-body custom-scroll" id="modal-body-content">
+                <!-- Se inyecta dinámicamente -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Dashboard de Métricas y Notificaciones -->
+    <div id="dashboard-modal" class="glass-modal hidden">
+        <div class="modal-content large-modal">
+            <div class="modal-header">
+                <h3 style="color: #38bdf8;">📊 Reporte de Notificaciones & Saneamiento • Subsector 1A-4</h3>
+                <button id="btn-close-dashboard-modal" class="btn-close">×</button>
+            </div>
+            <div class="modal-body custom-scroll">
+                
+                <!-- KPI Grid -->
+                <div class="metrics-grid" id="dashboard-kpis">
+                    <!-- Dinámico -->
+                </div>
+
+                <!-- Gráficos Estadísticos SVG -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                    <!-- Gráfico por Asociación -->
+                    <div class="prop-section-card">
+                        <h4>🏢 Distribución por Asociación</h4>
+                        <div id="chart-asociaciones" style="width: 100%; min-height: 220px; display: flex; align-items: center; justify-content: center;"></div>
+                    </div>
+                    <!-- Gráfico por Estado -->
+                    <div class="prop-section-card">
+                        <h4>📋 Distribución por Estado de Notificación</h4>
+                        <div id="chart-estados" style="width: 100%; min-height: 220px; display: flex; align-items: center; justify-content: center;"></div>
+                    </div>
+                </div>
+
+                <!-- Tabla del Padrón -->
+                <div class="prop-section-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                        <h4 style="margin: 0;">📑 Padrón de Predios a Notificar (77 Lotes)</h4>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" id="filter-table-input" placeholder="Filtrar tabla..." class="styled-select" style="width: 200px; padding: 6px 10px; font-size: 11px;">
+                            <button id="btn-download-table-excel" class="btn-primary" style="background: #15803d; font-size: 11px; padding: 6px 12px;">Descargar Excel</button>
+                        </div>
+                    </div>
+                    <div class="custom-scroll" style="max-height: 300px; overflow-y: auto; overflow-x: auto; border: 1px solid var(--glass-border); border-radius: 8px;">
+                        <table id="dashboard-table" style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
+                            <thead style="background: rgba(15, 23, 42, 0.95); position: sticky; top: 0; z-index: 2;">
+                                <tr style="border-bottom: 1px solid var(--glass-border); color: var(--accent);">
+                                    <th style="padding: 8px;">CÓDIGO</th>
+                                    <th style="padding: 8px;">ASOCIACIÓN</th>
+                                    <th style="padding: 8px;">MZ/LT</th>
+                                    <th style="padding: 8px;">ESTADO</th>
+                                    <th style="padding: 8px;">CARPETA</th>
+                                    <th style="padding: 8px;">TITULAR 1</th>
+                                    <th style="padding: 8px;">DNI 1</th>
+                                    <th style="padding: 8px; text-align: center;">ACCIÓN</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dashboard-table-body">
+                                <!-- Dinámico -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Información y Ayuda -->
+    <div id="help-modal" class="glass-modal hidden">
+        <div class="modal-content" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3>ℹ️ Acerca del Visor GIS</h3>
+                <button id="btn-close-help-modal" class="btn-close">×</button>
+            </div>
+            <div class="modal-body custom-scroll" style="font-size: 12px; line-height: 1.6; color: #cbd5e1;">
+                <p><strong style="color: var(--accent);">Visor GIS de Notificaciones y Saneamiento</strong> para el <strong style="color: #fff;">Subsector 1A-4</strong> de Chen Chen, Moquegua.</p>
+                <p>Este sistema sincroniza en tiempo real los polígonos prediales catastrales con la hoja de cálculo de Google Sheets de seguimiento de notificaciones.</p>
+                
+                <h4 style="color: #38bdf8; margin: 16px 0 6px 0; font-size: 12px; text-transform: uppercase;">Capas y Fuentes:</h4>
+                <ul style="padding-left: 18px; margin: 0 0 12px 0;">
+                    <li><strong>Cartografía Base:</strong> 311 polígonos en formato GeoJSON WGS84 del Subsector 1A-4.</li>
+                    <li><strong>Padrón de Notificaciones:</strong> 77 predios priorizados con estados <em>SIN CARPETA</em> y <em>NO TITULADO</em>.</li>
+                    <li><strong>Fondos Cartográficos:</strong> Fondo 1 (24,000 predios de Moquegua), Fondo 2 y Fondo 3 descargables bajo demanda con consulta de atributos SUNARP.</li>
+                    <li><strong>Ajuste Fino:</strong> Calibración milimétrica en tiempo real (+E/-W, +N/-S) en coordenadas planas.</li>
+                </ul>
+
+                <h4 style="color: #38bdf8; margin: 16px 0 6px 0; font-size: 12px; text-transform: uppercase;">Atajos de Selección:</h4>
+                <ul style="padding-left: 18px; margin: 0;">
+                    <li><strong>Clic en polígono:</strong> Abre la ficha técnica del predio.</li>
+                    <li><strong>Doble clic:</strong> Zoom directo al predio seleccionado.</li>
+                    <li><strong>Dibujar Área:</strong> Filtro espacial por polígono trazado (Ray-Casting PIP).</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+</body>
+</html>
