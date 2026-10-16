@@ -46,7 +46,21 @@ export function isFeatureInsideSelection(featureLayer, selectionPolygonLatLngs) 
         }
     }
 
-    // 2. Check individual geometry vertices
+    // 2. Check individual geometry vertices (prefer actual shifted layer coordinates)
+    if (featureLayer.getLatLngs) {
+        const raw = featureLayer.getLatLngs();
+        const rings = Array.isArray(raw[0]) ? (Array.isArray(raw[0][0]) ? raw : [raw[0]]) : [raw];
+        for (const ring of rings) {
+            for (const pt of ring) {
+                if (pt && typeof pt.lng === 'number' && typeof pt.lat === 'number') {
+                    if (pointInPolygon({ x: pt.lng, y: pt.lat }, vs)) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
     const geom = featureLayer.feature ? featureLayer.feature.geometry : featureLayer.geometry;
     if (!geom) return false;
 

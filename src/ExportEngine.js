@@ -286,7 +286,23 @@ export function generateExcelWorkbook(layers) {
             rings = [feature.geometry.coordinates[0].map(pt => ({ lat: pt[1], lng: pt[0] }))];
         }
 
-        if (layer.getBounds) {
+        if (rings.length > 0 && rings[0].length > 0) {
+            let sumLat = 0, sumLng = 0, cCount = 0;
+            rings[0].forEach(pt => {
+                if (pt && typeof pt.lat === 'number' && typeof pt.lng === 'number') {
+                    sumLat += pt.lat;
+                    sumLng += pt.lng;
+                    cCount++;
+                }
+            });
+            if (cCount > 0) {
+                centerLat = sumLat / cCount;
+                centerLng = sumLng / cCount;
+                const utmC = latLonToUTM(centerLat, centerLng);
+                utmEste = utmC.x;
+                utmNorte = utmC.y;
+            }
+        } else if (layer.getBounds) {
             const c = layer.getBounds().getCenter();
             centerLat = c.lat;
             centerLng = c.lng;

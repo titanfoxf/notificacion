@@ -471,7 +471,54 @@ function calculateOffsetDegrees() {
 }
 
 /**
- * Desplaza directamente los arreglos de geometría con 60 FPS sin reconstruir capas
+ * Obtiene el centroide o centro exacto actual de un layer (polígono),
+ * calculándolo a partir de sus coordenadas en tiempo real (considerando desplazamientos).
+ */
+function getLayerActualCenter(layer) {
+    if (!layer) return null;
+
+    // Si es un grupo de capas (ej. MultiPolygon)
+    if (layer.eachLayer && !layer.getLatLngs) {
+        let sumLat = 0, sumLng = 0, count = 0;
+        layer.eachLayer(child => {
+            const c = getLayerActualCenter(child);
+            if (c) {
+                sumLat += c.lat;
+                sumLng += c.lng;
+                count++;
+            }
+        });
+        if (count > 0) return L.latLng(sumLat / count, sumLng / count);
+    }
+
+    if (layer.getLatLngs) {
+        const raw = layer.getLatLngs();
+        // Desenvolver arrays anidados para obtener el anillo exterior principal
+        const ring = Array.isArray(raw[0]) ? (Array.isArray(raw[0][0]) ? raw[0][0] : raw[0]) : raw;
+        if (ring && ring.length > 0) {
+            let sumLat = 0, sumLng = 0, count = 0;
+            for (let i = 0; i < ring.length; i++) {
+                const pt = ring[i];
+                if (pt && typeof pt.lat === 'number' && typeof pt.lng === 'number') {
+                    sumLat += pt.lat;
+                    sumLng += pt.lng;
+                    count++;
+                }
+            }
+            if (count > 0) {
+                return L.latLng(sumLat / count, sumLng / count);
+            }
+        }
+    }
+
+    if (layer.getBounds) {
+        return layer.getBounds().getCenter();
+    }
+    return null;
+}
+
+/**
+ * Desplaza directamente los arreglos de geometría y etiquetas con 60 FPS sin reconstruir capas
  */
 function applyOffsetInRealTime() {
     const { dLat, dLng } = calculateOffsetDegrees();
@@ -488,6 +535,14 @@ function applyOffsetInRealTime() {
             };
             layer._originalLatLngs = cloneCoords(layer.getLatLngs());
         }
+
+        // Guardar bounds originales fijos la primera vez
+        if (!layer._originalBounds && layer._bounds) {
+            layer._originalBounds = L.latLngBounds(
+                L.latLng(layer._bounds.getSouthWest().lat, layer._bounds.getSouthWest().lng),
+                L.latLng(layer._bounds.getNorthEast().lat, layer._bounds.getNorthEast().lng)
+            );
+        }
         
         // Mutar arreglo actual con el delta
         const mutateCoords = (orig, curr) => {
@@ -501,13 +556,42 @@ function applyOffsetInRealTime() {
         };
         
         mutateCoords(layer._originalLatLngs, layer.getLatLngs());
+
+        // Actualizar layer._bounds para que coincida exactamente con las nuevas coordenadas desplazadas
+        if (layer._originalBounds) {
+            const sw = layer._originalBounds.getSouthWest();
+            const ne = layer._originalBounds.getNorthEast();
+            layer._bounds = L.latLngBounds(
+                L.latLng(sw.lat + dLat, sw.lng + dLng),
+                L.latLng(ne.lat + dLat, ne.lng + dLng)
+            );
+        } else if (layer.getLatLngs) {
+            layer._bounds = L.latLngBounds(layer.getLatLngs());
+        }
+
         layer.redraw(); // Leaflet repinta el path SVG directamente
+
+        // Si este polígono tiene un marcador de texto asociado, moverlo inmediatamente en sincronía absoluta
+        if (layer._labelMarker) {
+            const newCenter = getLayerActualCenter(layer);
+            if (newCenter) {
+                layer._labelMarker.setLatLng(newCenter);
+            }
+        }
     };
 
     // Aplicar a los predios de notificación
     if (AppState.geojsonLayer) {
         AppState.geojsonLayer.eachLayer(l => {
-            if (l.eachLayer) l.eachLayer(shiftLayerGeo); else shiftLayerGeo(l);
+            if (l.eachLayer) {
+                l.eachLayer(shiftLayerGeo);
+                if (l._labelMarker) {
+                    const newCenter = getLayerActualCenter(l);
+                    if (newCenter) l._labelMarker.setLatLng(newCenter);
+                }
+            } else {
+                shiftLayerGeo(l);
+            }
         });
     }
 
@@ -647,6 +731,10 @@ function buildVectorLayer() {
     }).addTo(AppState.map);
 
     AppState.map.fitBounds(AppState.geojsonLayer.getBounds(), { padding: [30, 30] });
+
+    if (AppState.offsetE !== 0 || AppState.offsetN !== 0) {
+        applyOffsetInRealTime();
+    }
 }
 
 function highlightLayer(layer) {
@@ -752,21 +840,59 @@ function updateCounterBadges(notif, sinCarp, noTit, otros) {
 
 function updateLabels() {
     if (!AppState.labelGroup) return;
-    AppState.labelGroup.clearLayers();
 
-    if (!AppState.showLabels) return;
+    if (!AppState.showLabels) {
+        AppState.labelGroup.clearLayers();
+        if (AppState.geojsonLayer) {
+            AppState.geojsonLayer.eachLayer(l => {
+                l._labelMarker = null;
+                if (l.eachLayer) l.eachLayer(child => { child._labelMarker = null; });
+            });
+        }
+        return;
+    }
 
     const zoom = AppState.map.getZoom();
-    if (zoom < 16) return; // Limpieza en vista macro
+    if (zoom < 16) {
+        AppState.labelGroup.clearLayers();
+        if (AppState.geojsonLayer) {
+            AppState.geojsonLayer.eachLayer(l => {
+                l._labelMarker = null;
+                if (l.eachLayer) l.eachLayer(child => { child._labelMarker = null; });
+            });
+        }
+        return; // Limpieza en vista macro
+    }
 
     const bounds = AppState.map.getBounds().pad(0.1);
+    const visibleSet = new Set(AppState.visibleLayers);
+
+    // Limpiar marcadores de capas que ya no están visibles
+    if (AppState.geojsonLayer) {
+        AppState.geojsonLayer.eachLayer(layer => {
+            if (!visibleSet.has(layer) && layer._labelMarker) {
+                AppState.labelGroup.removeLayer(layer._labelMarker);
+                layer._labelMarker = null;
+            }
+        });
+    }
 
     AppState.visibleLayers.forEach(layer => {
         if (!layer.getBounds) return;
         const layerBounds = layer.getBounds();
-        if (!bounds.intersects(layerBounds)) return;
+        const isInView = bounds.intersects(layerBounds);
 
-        const props = layer.feature.properties;
+        if (!isInView) {
+            if (layer._labelMarker && AppState.labelGroup.hasLayer(layer._labelMarker)) {
+                AppState.labelGroup.removeLayer(layer._labelMarker);
+            }
+            return;
+        }
+
+        const center = getLayerActualCenter(layer);
+        if (!center) return;
+
+        const props = layer.feature ? layer.feature.properties : {};
         const cod = props.COD_PROMUVI || '';
         const sheetData = AppState.dbSheet.get(cod.toUpperCase()) || AppState.dbSheet.get(normCode(cod));
 
@@ -791,14 +917,31 @@ function updateLabels() {
             className += ' otros';
         }
 
-        // DivIcon transparente sin ningún fondo o borde de Leaflet
-        const icon = L.divIcon({
-            className: 'cus-wrapper',
-            html: `<div class="${className}">${text}</div>`,
-            iconSize: [0, 0]
-        });
+        const labelKey = `${text}_${className}`;
 
-        L.marker(layerBounds.getCenter(), { icon: icon, interactive: false }).addTo(AppState.labelGroup);
+        if (layer._labelMarker) {
+            layer._labelMarker.setLatLng(center);
+            if (layer._labelKey !== labelKey) {
+                layer._labelKey = labelKey;
+                layer._labelMarker.setIcon(L.divIcon({
+                    className: 'cus-wrapper',
+                    html: `<div class="${className}">${text}</div>`,
+                    iconSize: [0, 0]
+                }));
+            }
+            if (!AppState.labelGroup.hasLayer(layer._labelMarker)) {
+                AppState.labelGroup.addLayer(layer._labelMarker);
+            }
+        } else {
+            layer._labelKey = labelKey;
+            const icon = L.divIcon({
+                className: 'cus-wrapper',
+                html: `<div class="${className}">${text}</div>`,
+                iconSize: [0, 0]
+            });
+            layer._labelMarker = L.marker(center, { icon: icon, interactive: false });
+            AppState.labelGroup.addLayer(layer._labelMarker);
+        }
     });
 }
 
