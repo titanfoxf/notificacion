@@ -88,7 +88,17 @@ const AppState = {
 
     // Capas visibles activas
     visibleLayers: [],
-    highlightedLayer: null
+    highlightedLayer: null,
+
+    // Recopilación en Campo (Fotos y Notificaciones a Google Drive / Sheets)
+    fieldAppsScriptUrl: localStorage.getItem('field_apps_script_url') || '',
+    fieldRecordsMap: new Map(), // COD_PROMUVI -> Registro de campo
+    currentFieldLotProps: null,
+    capturedPhotoBase64: null,
+    capturedPhotoDataUrl: null,
+    currentFieldGps: null,
+    gpsUserMarker: null,
+    gpsUserCircle: null
 };
 
 // ====== UTILIDADES ======
@@ -836,6 +846,7 @@ function updateLabels() {
 function openPropertyModal(props) {
     const cod = props.COD_PROMUVI || 'PREDIO';
     const sheetData = AppState.dbSheet.get(cod.toUpperCase()) || AppState.dbSheet.get(normCode(cod));
+    const fieldRecord = AppState.fieldRecordsMap.get(cod.toUpperCase()) || AppState.fieldRecordsMap.get(normCode(cod));
 
     document.getElementById('modal-title').textContent = `Ficha de Predio • ${cod}`;
 
@@ -933,9 +944,33 @@ function openPropertyModal(props) {
                 </div>
             </div>
 
-            <div style="display: flex; gap: 10px; margin-top: 4px;">
-                <a href="${googleEarthWebUrl}" target="_blank" class="btn-primary" style="flex: 1; text-decoration: none; background: #0284c7;">
-                    🌍 Abrir en Google Earth
+            ${fieldRecord ? `
+            <div class="prop-section-card" style="border: 1.5px solid rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h4 style="color: #34d399; margin: 0;">📋 Notificación Registrada en Campo</h4>
+                    <span class="field-lot-tag" style="background: #10b981; font-size: 11px;">${fieldRecord.estado_notificacion}</span>
+                </div>
+                <div style="font-size: 11px; color: #cbd5e1; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+                    <div>📅 Fecha: <strong style="color: #fff;">${fieldRecord.fecha_notificacion}</strong> ${fieldRecord.notificador ? `• Notificador: <strong style="color: #38bdf8;">${fieldRecord.notificador}</strong>` : ''}</div>
+                    ${fieldRecord.observaciones ? `<div>📝 Observaciones: <em>"${fieldRecord.observaciones}"</em></div>` : ''}
+                    ${fieldRecord.gps_lat ? `<div>📍 GPS: ${Number(fieldRecord.gps_lat).toFixed(5)}, ${Number(fieldRecord.gps_lng).toFixed(5)} (±${Number(fieldRecord.gps_precision || 0).toFixed(1)}m)</div>` : ''}
+                    ${fieldRecord.foto_url ? `
+                    <div style="margin-top: 6px;">
+                        <a href="${fieldRecord.foto_url}" target="_blank" style="display: inline-flex; align-items: center; gap: 4px; color: #38bdf8; font-weight: 700; text-decoration: underline;">
+                            🖼️ Ver Foto de Evidencia en Google Drive ↗
+                        </a>
+                    </div>
+                    ` : ''}
+                </div>
+            </div>
+            ` : ''}
+
+            <div style="display: flex; gap: 10px; margin-top: 4px; flex-wrap: wrap;">
+                <button type="button" id="btn-open-field-capture" class="btn-primary" style="flex: 1.2; min-width: 180px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); font-weight: 800; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.45); display: flex; align-items: center; justify-content: center; gap: 6px; border: none; cursor: pointer;">
+                    📸 ${fieldRecord ? 'Actualizar Notificación en Campo' : 'Registrar Notificación en Campo'}
+                </button>
+                <a href="${googleEarthWebUrl}" target="_blank" class="btn-secondary" style="flex: 0.8; min-width: 130px; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                    🌍 Google Earth
                 </a>
             </div>
         </div>
@@ -943,6 +978,298 @@ function openPropertyModal(props) {
 
     document.getElementById('modal-body-content').innerHTML = html;
     document.getElementById('property-modal').classList.remove('hidden');
+
+    document.getElementById('btn-open-field-capture')?.addEventListener('click', () => {
+        document.getElementById('property-modal').classList.add('hidden');
+        openFieldCaptureModal(props);
+    });
+}
+
+// ====== MOTOR DE RECOPILACIÓN EN CAMPO (FOTOS A DRIVE & SHEETS) ======
+
+function loadLocalFieldRecords() {
+    try {
+        const saved = localStorage.getItem('FIELD_NOTIFICACIONES_RECORDS');
+        if (saved) {
+            const arr = JSON.parse(saved);
+            arr.forEach(item => {
+                if (item.cod_promuvi) {
+                    AppState.fieldRecordsMap.set(item.cod_promuvi.toUpperCase(), item);
+                    AppState.fieldRecordsMap.set(normCode(item.cod_promuvi), item);
+                }
+            });
+        }
+    } catch(e) {
+        console.warn('Error al cargar registros locales de campo:', e);
+    }
+}
+
+function saveLocalFieldRecord(record) {
+    try {
+        AppState.fieldRecordsMap.set(record.cod_promuvi.toUpperCase(), record);
+        AppState.fieldRecordsMap.set(normCode(record.cod_promuvi), record);
+        const existing = JSON.parse(localStorage.getItem('FIELD_NOTIFICACIONES_RECORDS') || '[]');
+        const idx = existing.findIndex(e => normCode(e.cod_promuvi) === normCode(record.cod_promuvi));
+        if (idx !== -1) existing[idx] = record;
+        else existing.push(record);
+        localStorage.setItem('FIELD_NOTIFICACIONES_RECORDS', JSON.stringify(existing));
+    } catch(e) {
+        console.warn('Error al guardar registro local de campo:', e);
+    }
+}
+
+/**
+ * Comprime fotografías de alta resolución en el navegador para subida ultra rápida
+ */
+function compressImage(file, maxWidth = 1280, maxHeight = 1280, quality = 0.75) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                let width = img.width;
+                let height = img.height;
+                if (width > height) {
+                    if (width > maxWidth) {
+                        height = Math.round((height * maxWidth) / width);
+                        width = maxWidth;
+                    }
+                } else {
+                    if (height > maxHeight) {
+                        width = Math.round((width * maxHeight) / height);
+                        height = maxHeight;
+                    }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                const base64 = dataUrl.split(',')[1];
+                resolve({ dataUrl, base64, width, height, sizeBytes: Math.round(base64.length * 0.75) });
+            };
+            img.onerror = reject;
+            img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+function getDistanceMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371e3;
+    const phi1 = lat1 * Math.PI / 180;
+    const phi2 = lat2 * Math.PI / 180;
+    const dPhi = (lat2 - lat1) * Math.PI / 180;
+    const dLam = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dPhi / 2) * Math.sin(dPhi / 2) +
+              Math.cos(phi1) * Math.cos(phi2) *
+              Math.sin(dLam / 2) * Math.sin(dLam / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+function requestFieldGps(targetLat, targetLng) {
+    const gpsStatusEl = document.getElementById('field-gps-status');
+    const gpsBox = document.getElementById('field-gps-box');
+    if (!gpsStatusEl || !gpsBox) return;
+
+    if (!navigator.geolocation) {
+        gpsStatusEl.textContent = '⚠️ Geolocalización GPS no soportada en este navegador.';
+        return;
+    }
+
+    gpsStatusEl.textContent = '📍 Obteniendo coordenadas satelitales del GPS...';
+    gpsBox.className = 'field-gps-display';
+
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            const acc = pos.coords.accuracy || 0;
+            AppState.currentFieldGps = { lat, lng, accuracy: acc };
+
+            if (targetLat && targetLng) {
+                const dist = getDistanceMeters(lat, lng, targetLat, targetLng);
+                if (dist <= 40) {
+                    gpsBox.className = 'field-gps-display gps-match-success';
+                    gpsStatusEl.innerHTML = `✅ <strong>GPS:</strong> ${lat.toFixed(5)}, ${lng.toFixed(5)} (±${acc.toFixed(1)}m) • <span style="font-weight: 700;">¡Estás en el lote! (~${dist.toFixed(0)}m)</span>`;
+                } else {
+                    gpsBox.className = 'field-gps-display gps-match-warning';
+                    gpsStatusEl.innerHTML = `⚠️ <strong>GPS:</strong> ${lat.toFixed(5)}, ${lng.toFixed(5)} (±${acc.toFixed(1)}m) • Distancia al lote: <strong>~${dist.toFixed(0)}m</strong>`;
+                }
+            } else {
+                gpsStatusEl.innerHTML = `📍 <strong>GPS:</strong> ${lat.toFixed(5)}, ${lng.toFixed(5)} (Precisión: ±${acc.toFixed(1)}m)`;
+            }
+        },
+        (err) => {
+            console.warn('Error de GPS:', err);
+            gpsStatusEl.textContent = `⚠️ No se pudo obtener GPS (${err.message}). Puedes guardar la notificación sin GPS.`;
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+}
+
+function openFieldCaptureModal(props) {
+    AppState.currentFieldLotProps = props;
+    const cod = props.COD_PROMUVI || 'LOTE';
+    const sheetData = AppState.dbSheet.get(cod.toUpperCase()) || AppState.dbSheet.get(normCode(cod));
+
+    document.getElementById('field-lot-code').textContent = cod;
+    document.getElementById('field-lot-titular').textContent = (sheetData && sheetData.TITULAR_1) ? sheetData.TITULAR_1 : (props.ASOCIACIÓN || 'Subsector 1A-4');
+    document.getElementById('field-lot-details').textContent = `Mz: ${props.MANZANA || '-'} • Lote: ${props.LOTE || '-'} • Carpeta: ${sheetData ? sheetData.NRO_CARPETA : 'SIN CARPETA'}`;
+
+    // Resetear foto
+    AppState.capturedPhotoBase64 = null;
+    AppState.capturedPhotoDataUrl = null;
+    document.getElementById('photo-preview-container').classList.add('hidden');
+    document.getElementById('photo-upload-placeholder').classList.remove('hidden');
+    const camInput = document.getElementById('field-camera-input');
+    if (camInput) camInput.value = '';
+
+    // Cargar nombre de notificador guardado previamente
+    const savedNotifier = localStorage.getItem('field_notifier_name') || '';
+    const notifierInput = document.getElementById('field-notifier-name');
+    if (notifierInput && savedNotifier) notifierInput.value = savedNotifier;
+
+    // Resetear observaciones
+    const notesInput = document.getElementById('field-notes');
+    if (notesInput) notesInput.value = '';
+
+    // URL de Apps Script
+    const gasInput = document.getElementById('field-gas-url');
+    if (gasInput) gasInput.value = AppState.fieldAppsScriptUrl || '';
+
+    // Obtener centroide del lote para comparar distancia GPS
+    let lotLat = null, lotLng = null;
+    if (AppState.highlightedLayer && AppState.highlightedLayer.getBounds) {
+        const c = AppState.highlightedLayer.getBounds().getCenter();
+        lotLat = c.lat;
+        lotLng = c.lng;
+    }
+
+    requestFieldGps(lotLat, lotLng);
+
+    document.getElementById('field-capture-modal').classList.remove('hidden');
+}
+
+async function submitFieldRecord() {
+    if (!AppState.currentFieldLotProps) {
+        showToast('No hay ningún lote seleccionado.', 'warning');
+        return;
+    }
+
+    const cod = AppState.currentFieldLotProps.COD_PROMUVI;
+    const selectedRadio = document.querySelector('input[name="field-status-radio"]:checked');
+    const estado = selectedRadio ? selectedRadio.value : 'NOTIFICADO EN MANO';
+    const notifier = (document.getElementById('field-notifier-name')?.value || '').trim();
+    const notes = (document.getElementById('field-notes')?.value || '').trim();
+
+    if (notifier) {
+        localStorage.setItem('field_notifier_name', notifier);
+    }
+
+    const btnSubmit = document.getElementById('btn-submit-field-record');
+    if (btnSubmit) {
+        btnSubmit.disabled = true;
+        btnSubmit.innerHTML = '<span>⏳ Enviando a Google Drive y Sheets...</span>';
+    }
+
+    const record = {
+        cod_promuvi: cod,
+        estado_notificacion: estado,
+        fecha_notificacion: new Date().toLocaleString('es-PE'),
+        notificador: notifier,
+        observaciones: notes,
+        gps_lat: AppState.currentFieldGps ? AppState.currentFieldGps.lat : '',
+        gps_lng: AppState.currentFieldGps ? AppState.currentFieldGps.lng : '',
+        gps_precision: AppState.currentFieldGps ? AppState.currentFieldGps.accuracy : '',
+        foto_base64: AppState.capturedPhotoBase64 || '',
+        foto_url: ''
+    };
+
+    // 1. Guardar copia local de inmediato
+    saveLocalFieldRecord(record);
+
+    // 2. Si hay URL de Google Apps Script, enviar vía POST
+    if (AppState.fieldAppsScriptUrl) {
+        try {
+            const resp = await fetch(AppState.fieldAppsScriptUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(record)
+            });
+            const resJson = await resp.json();
+            if (resJson && resJson.foto_url) {
+                record.foto_url = resJson.foto_url;
+                saveLocalFieldRecord(record);
+            }
+            showToast(`✅ Notificación y foto subidas a Google Drive con éxito (${cod}).`, 'success', 5000);
+        } catch (err) {
+            console.warn('Error al enviar a Apps Script:', err);
+            showToast(`⚠️ Guardado en celular. Al reconectar se subirá a Drive: ${err.message}`, 'warning', 6000);
+        }
+    } else {
+        showToast(`✅ Notificación guardada en el dispositivo (${cod}). Pega la URL de Apps Script para subida directa a Drive.`, 'info', 6000);
+    }
+
+    if (btnSubmit) {
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = '<span>💾 Guardar y Enviar Notificación a Google Drive</span>';
+    }
+
+    document.getElementById('field-capture-modal')?.classList.add('hidden');
+
+    // Refrescar modal de lote para mostrar la nueva información
+    openPropertyModal(AppState.currentFieldLotProps);
+    showToast(`Estado de ${cod} actualizado a: ${estado}`, 'success');
+}
+
+/**
+ * Centra el mapa en la ubicación satelital GPS en tiempo real del usuario
+ */
+function locateUserOnMap() {
+    if (!navigator.geolocation) {
+        showToast('Geolocalización GPS no soportada en este dispositivo.', 'warning');
+        return;
+    }
+
+    showToast('Obteniendo tu ubicación satelital GPS...', 'info', 2500);
+
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            const acc = pos.coords.accuracy || 10;
+
+            if (AppState.gpsUserMarker) AppState.map.removeLayer(AppState.gpsUserMarker);
+            if (AppState.gpsUserCircle) AppState.map.removeLayer(AppState.gpsUserCircle);
+
+            AppState.gpsUserCircle = L.circle([lat, lng], {
+                radius: acc,
+                color: '#38bdf8',
+                fillColor: '#38bdf8',
+                fillOpacity: 0.15,
+                weight: 1
+            }).addTo(AppState.map);
+
+            AppState.gpsUserMarker = L.circleMarker([lat, lng], {
+                radius: 8,
+                fillColor: '#0284c7',
+                color: '#ffffff',
+                weight: 2.5,
+                fillOpacity: 1
+            }).addTo(AppState.map);
+
+            AppState.map.setView([lat, lng], 19);
+            showToast(`Ubicación GPS fijada (Precisión: ±${acc.toFixed(1)}m).`, 'success');
+        },
+        (err) => {
+            showToast(`No se pudo obtener GPS: ${err.message}`, 'error');
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
 }
 
 // ====== DASHBOARD DE MÉTRICAS & PADRÓN ======
@@ -1698,10 +2025,104 @@ function setupEventListeners() {
         const blob = new Blob([excelArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         downloadFile(blob, `Padron_Notificaciones_${Date.now()}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     });
+
+    // 17. Recopilación de Campo (Fotos, GPS, Estados)
+    document.getElementById('btn-gps-locate')?.addEventListener('click', locateUserOnMap);
+
+    // Abrir selector de cámara al tocar el dropzone
+    const photoPlaceholder = document.getElementById('photo-upload-placeholder');
+    const cameraInput = document.getElementById('field-camera-input');
+    if (photoPlaceholder && cameraInput) {
+        photoPlaceholder.addEventListener('click', () => cameraInput.click());
+    }
+
+    // Procesamiento y compresión de imagen tomada por el celular
+    cameraInput?.addEventListener('change', async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        showToast('Procesando y optimizando fotografía...', 'info', 2000);
+        try {
+            const compressed = await compressImage(file, 1280, 1280, 0.75);
+            AppState.capturedPhotoBase64 = compressed.base64;
+            AppState.capturedPhotoDataUrl = compressed.dataUrl;
+
+            const previewImg = document.getElementById('photo-preview-img');
+            const previewBox = document.getElementById('photo-preview-container');
+            const infoText = document.getElementById('photo-file-info');
+
+            if (previewImg) previewImg.src = compressed.dataUrl;
+            if (infoText) {
+                const kb = Math.round(compressed.sizeBytes / 1024);
+                infoText.textContent = `${compressed.width}x${compressed.height} px • ${kb} KB • Optimizado`;
+            }
+            if (photoPlaceholder) photoPlaceholder.classList.add('hidden');
+            if (previewBox) previewBox.classList.remove('hidden');
+
+            showToast('Foto cargada y comprimida correctamente.', 'success');
+        } catch (err) {
+            console.error('Error al comprimir imagen:', err);
+            showToast('No se pudo procesar la imagen.', 'error');
+        }
+    });
+
+    // Retomar y Quitar Foto
+    document.getElementById('btn-retake-photo')?.addEventListener('click', () => {
+        cameraInput?.click();
+    });
+
+    document.getElementById('btn-remove-photo')?.addEventListener('click', () => {
+        AppState.capturedPhotoBase64 = null;
+        AppState.capturedPhotoDataUrl = null;
+        if (cameraInput) cameraInput.value = '';
+        document.getElementById('photo-preview-container')?.classList.add('hidden');
+        document.getElementById('photo-upload-placeholder')?.classList.remove('hidden');
+    });
+
+    // Refrescar GPS en modal de campo
+    document.getElementById('btn-refresh-field-gps')?.addEventListener('click', () => {
+        let lotLat = null, lotLng = null;
+        if (AppState.highlightedLayer && AppState.highlightedLayer.getBounds) {
+            const c = AppState.highlightedLayer.getBounds().getCenter();
+            lotLat = c.lat;
+            lotLng = c.lng;
+        }
+        requestFieldGps(lotLat, lotLng);
+    });
+
+    // Enviar registro de campo
+    document.getElementById('btn-submit-field-record')?.addEventListener('click', submitFieldRecord);
+
+    // Cerrar modal de campo
+    document.getElementById('btn-close-field-modal')?.addEventListener('click', () => {
+        document.getElementById('field-capture-modal')?.classList.add('hidden');
+    });
+    document.getElementById('btn-cancel-field-modal')?.addEventListener('click', () => {
+        document.getElementById('field-capture-modal')?.classList.add('hidden');
+    });
+
+    // Desplegable de Configuración de Google Apps Script
+    document.getElementById('toggle-gas-config')?.addEventListener('click', () => {
+        const panel = document.getElementById('gas-config-panel');
+        const arrow = document.getElementById('arrow-gas-config');
+        if (panel) {
+            const isHidden = panel.classList.contains('hidden');
+            panel.classList.toggle('hidden', !isHidden);
+            if (arrow) arrow.textContent = isHidden ? '▼' : '▶';
+        }
+    });
+
+    document.getElementById('btn-save-gas-url')?.addEventListener('click', () => {
+        const url = (document.getElementById('field-gas-url')?.value || '').trim();
+        AppState.fieldAppsScriptUrl = url;
+        localStorage.setItem('field_apps_script_url', url);
+        showToast(url ? 'URL de Google Apps Script guardada.' : 'URL eliminada.', 'success');
+    });
 }
 
 // ====== ARRANQUE ======
 window.addEventListener('DOMContentLoaded', () => {
+    loadLocalFieldRecords();
     initMap();
     setupEventListeners();
     loadAllData();

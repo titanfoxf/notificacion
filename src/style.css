@@ -991,5 +991,233 @@ select.styled-select option {
 .custom-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 4px; }
 .custom-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
 
+/* ========================================================
+   MODAL DE RECOPILACIÓN EN CAMPO (FOTOS & NOTIFICACIÓN)
+   ======================================================== */
+.modal-content.medium-modal {
+    width: 480px;
+    max-width: 95vw;
+    max-height: 92vh;
+}
+
+.lot-summary-card {
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: 12px;
+    padding: 12px 14px;
+}
+
+.field-lot-tag {
+    background: #0284c7;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 800;
+    padding: 3px 10px;
+    border-radius: 6px;
+    letter-spacing: 0.5px;
+    font-family: monospace;
+}
+
+.field-titular-tag {
+    font-size: 11px;
+    font-weight: 700;
+    color: #fef08a;
+    background: rgba(254, 240, 138, 0.12);
+    border: 1px solid rgba(254, 240, 138, 0.3);
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+
+.field-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.field-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.3px;
+}
+
+.field-required {
+    font-size: 10px;
+    color: #f59e0b;
+    font-weight: 700;
+}
+
+/* Opciones de Estado de Notificación */
+.status-options-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.status-radio-card {
+    display: flex;
+    align-items: center;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1.5px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.status-radio-card:hover {
+    border-color: rgba(56, 189, 248, 0.5);
+    background: rgba(15, 23, 42, 0.85);
+}
+
+.status-radio-card input[type="radio"] {
+    accent-color: #10b981;
+    width: 16px;
+    height: 16px;
+    margin-right: 10px;
+    cursor: pointer;
+}
+
+.status-radio-card.active,
+.status-radio-card:has(input[type="radio"]:checked) {
+    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.12);
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
+}
+
+.radio-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+}
+
+.radio-icon {
+    font-size: 18px;
+    line-height: 1;
+}
+
+.radio-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.radio-text strong {
+    font-size: 12px;
+    color: #f8fafc;
+}
+
+.radio-text small {
+    font-size: 10px;
+    color: var(--text-dim);
+}
+
+/* Zona de Carga / Toma de Foto */
+.photo-dropzone {
+    border: 2px dashed rgba(56, 189, 248, 0.4);
+    background: rgba(15, 23, 42, 0.5);
+    border-radius: 12px;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.photo-dropzone:hover {
+    border-color: #38bdf8;
+    background: rgba(56, 189, 248, 0.08);
+    transform: translateY(-2px);
+}
+
+.photo-preview-box {
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.photo-preview-box img {
+    width: 100%;
+    max-height: 220px;
+    object-fit: cover;
+    display: block;
+}
+
+.photo-preview-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: rgba(15, 23, 42, 0.9);
+}
+
+.photo-info-text {
+    font-size: 11px;
+    color: #34d399;
+    font-family: monospace;
+    font-weight: 700;
+}
+
+/* Indicador GPS */
+.field-gps-display {
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 11px;
+    color: #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.gps-match-success {
+    border-color: rgba(16, 185, 129, 0.4);
+    background: rgba(16, 185, 129, 0.12);
+    color: #34d399;
+}
+
+.gps-match-warning {
+    border-color: rgba(245, 158, 11, 0.4);
+    background: rgba(245, 158, 11, 0.12);
+    color: #fbbf24;
+}
+
+.btn-submit-field {
+    padding: 12px;
+    font-size: 13px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-submit-field:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 25px rgba(16, 185, 129, 0.6);
+}
+
+.btn-submit-field:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
 /* Hidden Utility */
 .hidden { display: none !important; }

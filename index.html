@@ -312,6 +312,7 @@
         <!-- Floating Tool Buttons on Map -->
         <div id="float-map-tools">
             <button id="btn-toggle-sidebar" class="map-tool-btn" title="Mostrar/Ocultar Menú">☰</button>
+            <button id="btn-gps-locate" class="map-tool-btn" title="Mi Ubicación GPS en Campo">📍</button>
             <button id="btn-recenter" class="map-tool-btn" title="Centrar en Subsector 1A-4">🎯</button>
             <button id="btn-toggle-labels-map" class="map-tool-btn active" title="Alternar Etiquetas">🏷️</button>
             <button id="btn-open-help" class="map-tool-btn" title="Información y Ayuda">ℹ️</button>
@@ -371,6 +372,181 @@
             </div>
             <div class="modal-body custom-scroll" id="modal-body-content">
                 <!-- Se inyecta dinámicamente -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Recopilación de Información en Campo (Toma de Fotos & Notificación) -->
+    <div id="field-capture-modal" class="glass-modal hidden">
+        <div class="modal-content medium-modal">
+            <div class="modal-header" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(15, 23, 42, 0.95) 100%);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 22px;">📸</span>
+                    <div>
+                        <h3 id="field-modal-title" style="margin: 0; font-size: 15px; color: #f8fafc;">Registro de Campo en Lote</h3>
+                        <span id="field-modal-sub" style="font-size: 11px; color: #34d399; font-weight: 600;">Evidencia de Notificación • Google Drive & Sheets</span>
+                    </div>
+                </div>
+                <button id="btn-close-field-modal" class="btn-close">×</button>
+            </div>
+            <div class="modal-body custom-scroll" id="field-modal-body" style="padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+                <!-- Tarjeta Resumen del Lote -->
+                <div class="field-card lot-summary-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
+                        <span id="field-lot-code" class="field-lot-tag">1A-4_I_7</span>
+                        <span id="field-lot-titular" class="field-titular-tag">Titular</span>
+                    </div>
+                    <div id="field-lot-details" style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">
+                        Mz: I • Lote: 7 • Carpeta: --
+                    </div>
+                </div>
+
+                <!-- 1. Estado de Notificación -->
+                <div class="field-section">
+                    <label class="field-label">
+                        <span>1. Definir Estado de Notificación</span>
+                        <span class="field-required">* Requerido</span>
+                    </label>
+                    <div class="status-options-grid">
+                        <label class="status-radio-card" data-val="NOTIFICADO EN MANO">
+                            <input type="radio" name="field-status-radio" value="NOTIFICADO EN MANO" checked>
+                            <div class="radio-content">
+                                <span class="radio-icon">🤝</span>
+                                <div class="radio-text">
+                                    <strong>Notificado en Mano</strong>
+                                    <small>Recibido personalmente por titular o familiar</small>
+                                </div>
+                            </div>
+                        </label>
+
+                        <label class="status-radio-card" data-val="PEGADO EN PUERTA">
+                            <input type="radio" name="field-status-radio" value="PEGADO EN PUERTA">
+                            <div class="radio-content">
+                                <span class="radio-icon">🚪</span>
+                                <div class="radio-text">
+                                    <strong>Pegado en Puerta / Cédula</strong>
+                                    <small>Cédula fijada en fachada de predio</small>
+                                </div>
+                            </div>
+                        </label>
+
+                        <label class="status-radio-card" data-val="TITULAR AUSENTE">
+                            <input type="radio" name="field-status-radio" value="TITULAR AUSENTE">
+                            <div class="radio-content">
+                                <span class="radio-icon">⏳</span>
+                                <div class="radio-text">
+                                    <strong>Titular Ausente / Cerrado</strong>
+                                    <small>Predio habitado pero sin respuesta en visita</small>
+                                </div>
+                            </div>
+                        </label>
+
+                        <label class="status-radio-card" data-val="LOTE DESOCUPADO / ABANDONADO">
+                            <input type="radio" name="field-status-radio" value="LOTE DESOCUPADO / ABANDONADO">
+                            <div class="radio-content">
+                                <span class="radio-icon">🏚️</span>
+                                <div class="radio-text">
+                                    <strong>Desocupado / Abandonado</strong>
+                                    <small>Lote sin construir o completamente deshabitado</small>
+                                </div>
+                            </div>
+                        </label>
+
+                        <label class="status-radio-card" data-val="RECHAZADO">
+                            <input type="radio" name="field-status-radio" value="RECHAZADO">
+                            <div class="radio-content">
+                                <span class="radio-icon">🚫</span>
+                                <div class="radio-text">
+                                    <strong>Rechazado</strong>
+                                    <small>Ocupante se negó expresamente a recibir</small>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 2. Evidencia Fotográfica con Cámara -->
+                <div class="field-section">
+                    <label class="field-label">
+                        <span>2. Evidencia Fotográfica de Campo</span>
+                        <span style="font-size: 10px; color: #34d399; font-weight: 700;">📂 Guardado en Google Drive</span>
+                    </label>
+
+                    <input type="file" id="field-camera-input" accept="image/*" capture="environment" style="display: none;">
+                    
+                    <div id="photo-upload-placeholder" class="photo-dropzone">
+                        <span style="font-size: 32px;">📷</span>
+                        <strong style="color: #f8fafc; font-size: 13px;">Tocar aquí para Tomar Foto con la Cámara</strong>
+                        <small style="color: var(--text-muted); font-size: 11px;">Fachada del lote, cédula pegada o constancia de visita</small>
+                    </div>
+
+                    <div id="photo-preview-container" class="photo-preview-box hidden">
+                        <img id="photo-preview-img" src="" alt="Foto de Campo">
+                        <div class="photo-preview-actions">
+                            <span id="photo-file-info" class="photo-info-text">150 KB • Optimizado</span>
+                            <div style="display: flex; gap: 8px;">
+                                <button type="button" class="btn-secondary" style="font-size: 11px; padding: 5px 10px;" id="btn-retake-photo">
+                                    🔄 Retomar
+                                </button>
+                                <button type="button" class="btn-secondary" style="font-size: 11px; padding: 5px 10px; color: #ef4444; border-color: rgba(239,68,68,0.3);" id="btn-remove-photo">
+                                    🗑️ Quitar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Coordenadas GPS del Notificador -->
+                <div class="field-section">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <label class="field-label" style="margin: 0;">3. Ubicación GPS del Notificador</label>
+                        <button type="button" id="btn-refresh-field-gps" class="btn-icon-subtle" style="font-size: 11px; color: #38bdf8;">
+                            🔄 Actualizar GPS
+                        </button>
+                    </div>
+                    <div id="field-gps-box" class="field-gps-display">
+                        <span id="field-gps-status">📍 Obteniendo coordenadas del dispositivo...</span>
+                    </div>
+                </div>
+
+                <!-- 4. Notificador y Observaciones -->
+                <div class="field-section">
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <div>
+                            <label class="field-label">Nombre del Notificador / Responsable</label>
+                            <input type="text" id="field-notifier-name" class="styled-input" placeholder="Ej: Ing. Carlos Mamani" style="width: 100%;">
+                        </div>
+                        <div>
+                            <label class="field-label">Observaciones de la Diligencia</label>
+                            <textarea id="field-notes" class="styled-input" rows="2" placeholder="Ej: Atendió familiar directo, puerta de reja negra..." style="width: 100%; resize: vertical;"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botón de Envío -->
+                <div style="margin-top: 6px; display: flex; flex-direction: column; gap: 8px;">
+                    <button type="button" id="btn-submit-field-record" class="btn-primary btn-submit-field">
+                        <span>💾 Guardar y Enviar Notificación a Google Drive</span>
+                    </button>
+                    <button type="button" id="btn-cancel-field-modal" class="btn-secondary" style="padding: 9px; font-size: 12px;">
+                        Cancelar
+                    </button>
+                </div>
+
+                <!-- Configuración de Conexión Google Apps Script (Colapsable) -->
+                <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+                    <div id="toggle-gas-config" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; color: var(--text-muted); font-size: 11px;">
+                        <span>⚙️ Configuración de Conexión (Google Apps Script)</span>
+                        <span id="arrow-gas-config">▶</span>
+                    </div>
+                    <div id="gas-config-panel" class="hidden" style="margin-top: 8px;">
+                        <input type="url" id="field-gas-url" class="styled-input" placeholder="https://script.google.com/macros/s/.../exec" style="width: 100%; font-size: 11px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 10px;">
+                            <span style="color: var(--text-dim);">Pega la URL de tu Web App desplegado en Apps Script</span>
+                            <button type="button" id="btn-save-gas-url" class="btn-secondary" style="padding: 4px 10px; font-size: 11px;">Guardar URL</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
