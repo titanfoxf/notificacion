@@ -478,121 +478,194 @@ select.styled-select option {
     gap: 8px;
 }
 
-/* Floating Fine Tune Widget (Esquina inferior izquierda del mapa) */
-#float-fine-tune {
+/* ========================================================
+   ESTACIÓN DE CALIBRACIÓN CARTOGRÁFICA EN "L" (ESTILO SANEAMIENTO)
+   ======================================================== */
+.float-calibration-station {
     position: absolute;
     bottom: 20px;
     left: 20px;
     z-index: 1000;
-    width: 260px;
-    padding: 10px 14px;
-    background: rgba(16, 25, 46, 0.92);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 14px;
-    box-shadow: 0 10px 35px rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
     user-select: none;
+}
+
+/* Botón flotante Tuerca */
+.btn-gear-calibration {
+    pointer-events: auto;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(16, 25, 46, 0.92);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+    color: #f8fafc;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
     transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.fine-tune-header {
+.btn-gear-calibration:hover {
+    background: #0284c7;
+    border-color: #38bdf8;
+    transform: scale(1.08) rotate(45deg);
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.6);
+}
+
+.btn-gear-calibration.active {
+    background: #0284c7;
+    border-color: #38bdf8;
+    color: #fff;
+    box-shadow: 0 0 18px rgba(56, 189, 248, 0.5);
+}
+
+/* Envoltorio de los dos ejes en L */
+.l-axes-wrap {
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.l-axes-wrap.hidden {
+    display: none !important;
+}
+
+/* Caja Eje Vertical (Norte / Sur) */
+.axis-vertical-box {
+    background: rgba(16, 25, 46, 0.92);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 14px;
+    padding: 10px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+
+.slider-vertical-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.axis-limit-top,
+.axis-limit-bottom {
+    font-size: 10px;
+    font-weight: 800;
+    color: #38bdf8;
+    font-family: monospace;
+}
+
+/* Slider Vertical estilizado */
+.slider-vertical {
+    writing-mode: vertical-lr;
+    direction: rtl;
+    width: 24px;
+    height: 150px;
+    accent-color: #10b981;
+    cursor: pointer;
+    margin: 4px 0;
+}
+
+/* Caja Eje Horizontal (Este / Oeste) */
+.axis-horizontal-box {
+    background: rgba(16, 25, 46, 0.92);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 14px;
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+    min-width: 230px;
+}
+
+.axis-h-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    cursor: pointer;
+    gap: 8px;
 }
 
-.fine-tune-title-wrap {
+.slider-horizontal-wrap {
     display: flex;
     align-items: center;
     gap: 6px;
 }
 
-.fine-tune-title {
-    font-size: 11px;
-    font-weight: 700;
-    color: #f8fafc;
-    letter-spacing: 0.3px;
+.slider-horizontal {
+    flex: 1;
+    accent-color: #10b981;
+    cursor: pointer;
+    height: 6px;
 }
 
-.offset-summary-badge {
-    background: rgba(16, 185, 129, 0.15);
-    border: 1px solid rgba(16, 185, 129, 0.35);
-    color: #34d399;
+.axis-limit-left,
+.axis-limit-right {
     font-size: 10px;
-    font-weight: 700;
-    padding: 1px 6px;
-    border-radius: 10px;
+    font-weight: 800;
+    color: #38bdf8;
     font-family: monospace;
 }
 
-.btn-icon-subtle {
-    background: transparent;
-    border: none;
-    color: var(--text-muted);
-    font-size: 11px;
-    cursor: pointer;
-    padding: 2px 6px;
-    border-radius: 4px;
-    transition: 0.2s;
-}
-
-.btn-icon-subtle:hover {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.1);
-}
-
-.fine-tune-body {
-    margin-top: 10px;
+/* Insignias de Valores */
+.axis-badge {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
+    align-items: center;
+    gap: 6px;
 }
 
-#float-fine-tune.minimized .fine-tune-body {
-    display: none;
-}
-
-#float-fine-tune.minimized {
-    width: auto;
-    padding: 6px 12px;
-    border-radius: 20px;
-}
-
-.fine-tune-row {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-}
-
-.fine-tune-label {
-    display: flex;
-    justify-content: space-between;
-    font-size: 11px;
-    color: var(--text-muted);
-}
-
-.fine-tune-slider {
-    width: 100%;
-    accent-color: #10b981;
-    cursor: pointer;
-    height: 5px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 3px;
-}
-
-.fine-tune-nudges {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 4px;
-    margin-top: 2px;
-}
-
-.fine-tune-nudges .btn-nudge {
-    padding: 4px 2px;
+.axis-name {
     font-size: 10px;
     font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.3px;
+}
+
+.axis-val {
+    background: rgba(16, 185, 129, 0.18);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    color: #34d399;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-family: monospace;
+}
+
+.btn-axis-reset {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #e2e8f0;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-axis-reset:hover {
+    background: #ef4444;
+    border-color: #f87171;
+    color: #fff;
+    transform: translateY(-1px);
 }
 
 .map-tool-btn {

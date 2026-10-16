@@ -471,137 +471,78 @@ function calculateOffsetDegrees() {
 }
 
 /**
- * Obtiene el centroide o centro exacto actual de un layer (polígono),
- * calculándolo a partir de sus coordenadas en tiempo real (considerando desplazamientos).
- */
-function getLayerActualCenter(layer) {
-    if (!layer) return null;
-
-    // Si es un grupo de capas (ej. MultiPolygon)
-    if (layer.eachLayer && !layer.getLatLngs) {
-        let sumLat = 0, sumLng = 0, count = 0;
-        layer.eachLayer(child => {
-            const c = getLayerActualCenter(child);
-            if (c) {
-                sumLat += c.lat;
-                sumLng += c.lng;
-                count++;
-            }
-        });
-        if (count > 0) return L.latLng(sumLat / count, sumLng / count);
-    }
-
-    if (layer.getLatLngs) {
-        const raw = layer.getLatLngs();
-        // Desenvolver arrays anidados para obtener el anillo exterior principal
-        const ring = Array.isArray(raw[0]) ? (Array.isArray(raw[0][0]) ? raw[0][0] : raw[0]) : raw;
-        if (ring && ring.length > 0) {
-            let sumLat = 0, sumLng = 0, count = 0;
-            for (let i = 0; i < ring.length; i++) {
-                const pt = ring[i];
-                if (pt && typeof pt.lat === 'number' && typeof pt.lng === 'number') {
-                    sumLat += pt.lat;
-                    sumLng += pt.lng;
-                    count++;
-                }
-            }
-            if (count > 0) {
-                return L.latLng(sumLat / count, sumLng / count);
-            }
-        }
-    }
-
-    if (layer.getBounds) {
-        return layer.getBounds().getCenter();
-    }
-    return null;
-}
-
-/**
- * Desplaza directamente los arreglos de geometría y etiquetas con 60 FPS sin reconstruir capas
+ * Desplaza directamente las geometrías de capas (GeoJSON y Fondo) y actualiza sus límites en tiempo real.
  */
 function applyOffsetInRealTime() {
     const { dLat, dLng } = calculateOffsetDegrees();
 
-    const shiftLayerGeo = (layer) => {
-        if (!layer.getLatLngs) return;
-        
-        // Guardar coordenadas originales fijas la primera vez
-        if (!layer._originalLatLngs) {
-            const cloneCoords = (arr) => {
-                if (!arr) return arr;
-                if (arr.lat !== undefined) return { lat: arr.lat, lng: arr.lng };
-                return arr.map(cloneCoords);
+    const shiftLayer = (layer) => {
+        if (!layer) return;
+
+        // Si es un grupo contenedor (ej. GeoJSON o LayerGroup o MultiPolygon con subcapas)
+        if (layer.eachLayer) {
+            layer.eachLayer(shiftLayer);
+            return;
+        }
+
+        // 1. Mutar las coordenadas de los vértices si tiene getLatLngs
+        if (layer.getLatLngs) {
+            if (!layer._origLatLngs) {
+                const cloneCoords = (arr) => {
+                    if (!arr) return arr;
+                    if (arr.lat !== undefined) return { lat: arr.lat, lng: arr.lng };
+                    return arr.map(cloneCoords);
+                };
+                layer._origLatLngs = cloneCoords(layer.getLatLngs());
+            }
+
+            const mutateCoords = (orig, curr) => {
+                if (!orig || !curr) return;
+                if (orig.lat !== undefined && curr.lat !== undefined) {
+                    curr.lat = orig.lat + dLat;
+                    curr.lng = orig.lng + dLng;
+                } else if (Array.isArray(orig) && Array.isArray(curr)) {
+                    for (let i = 0; i < orig.length; i++) {
+                        mutateCoords(orig[i], curr[i]);
+                    }
+                }
             };
-            layer._originalLatLngs = cloneCoords(layer.getLatLngs());
+            mutateCoords(layer._origLatLngs, layer.getLatLngs());
         }
 
-        // Guardar bounds originales fijos la primera vez
-        if (!layer._originalBounds && layer._bounds) {
-            layer._originalBounds = L.latLngBounds(
-                L.latLng(layer._bounds.getSouthWest().lat, layer._bounds.getSouthWest().lng),
-                L.latLng(layer._bounds.getNorthEast().lat, layer._bounds.getNorthEast().lng)
-            );
+        // 2. Asegurar que layer._bounds exista antes de mutar
+        if (!layer._bounds && layer.getBounds) {
+            layer.getBounds();
         }
-        
-        // Mutar arreglo actual con el delta
-        const mutateCoords = (orig, curr) => {
-            if (!orig) return;
-            if (orig.lat !== undefined) {
-                curr.lat = orig.lat + dLat;
-                curr.lng = orig.lng + dLng;
-            } else {
-                for (let i = 0; i < orig.length; i++) mutateCoords(orig[i], curr[i]);
+
+        // 3. Mutar los bounds para que getBounds().getCenter() y intersects() estén 100% sincronizados
+        if (layer._bounds) {
+            if (!layer._origBounds) {
+                layer._origBounds = {
+                    southWest: { lat: layer._bounds._southWest.lat, lng: layer._bounds._southWest.lng },
+                    northEast: { lat: layer._bounds._northEast.lat, lng: layer._bounds._northEast.lng }
+                };
             }
-        };
-        
-        mutateCoords(layer._originalLatLngs, layer.getLatLngs());
-
-        // Actualizar layer._bounds para que coincida exactamente con las nuevas coordenadas desplazadas
-        if (layer._originalBounds) {
-            const sw = layer._originalBounds.getSouthWest();
-            const ne = layer._originalBounds.getNorthEast();
-            layer._bounds = L.latLngBounds(
-                L.latLng(sw.lat + dLat, sw.lng + dLng),
-                L.latLng(ne.lat + dLat, ne.lng + dLng)
-            );
-        } else if (layer.getLatLngs) {
-            layer._bounds = L.latLngBounds(layer.getLatLngs());
+            layer._bounds._southWest.lat = layer._origBounds.southWest.lat + dLat;
+            layer._bounds._southWest.lng = layer._origBounds.southWest.lng + dLng;
+            layer._bounds._northEast.lat = layer._origBounds.northEast.lat + dLat;
+            layer._bounds._northEast.lng = layer._origBounds.northEast.lng + dLng;
         }
 
-        layer.redraw(); // Leaflet repinta el path SVG directamente
-
-        // Si este polígono tiene un marcador de texto asociado, moverlo inmediatamente en sincronía absoluta
-        if (layer._labelMarker) {
-            const newCenter = getLayerActualCenter(layer);
-            if (newCenter) {
-                layer._labelMarker.setLatLng(newCenter);
-            }
+        if (layer.redraw) {
+            layer.redraw();
         }
     };
 
-    // Aplicar a los predios de notificación
     if (AppState.geojsonLayer) {
-        AppState.geojsonLayer.eachLayer(l => {
-            if (l.eachLayer) {
-                l.eachLayer(shiftLayerGeo);
-                if (l._labelMarker) {
-                    const newCenter = getLayerActualCenter(l);
-                    if (newCenter) l._labelMarker.setLatLng(newCenter);
-                }
-            } else {
-                shiftLayerGeo(l);
-            }
-        });
+        AppState.geojsonLayer.eachLayer(shiftLayer);
     }
 
-    // Aplicar TAMBIÉN a la capa de Fondo para que se muevan juntos solidariamente
     if (AppState.capaFondoGroup) {
-        AppState.capaFondoGroup.eachLayer(l => {
-            if (l.eachLayer) l.eachLayer(shiftLayerGeo); else shiftLayerGeo(l);
-        });
+        AppState.capaFondoGroup.eachLayer(shiftLayer);
     }
 
+    // Refrescar etiquetas para posicionarlas en el centro desplazado exacto
     updateLabels();
 }
 
@@ -609,18 +550,16 @@ function handleOffsetInput(eastMeters, northMeters) {
     AppState.offsetE = parseFloat(eastMeters) || 0;
     AppState.offsetN = parseFloat(northMeters) || 0;
 
-    const elE = document.getElementById('val-offset-e');
-    const elN = document.getElementById('val-offset-n');
-    if (elE) elE.textContent = (AppState.offsetE >= 0 ? '+' : '') + AppState.offsetE.toFixed(1) + " m";
-    if (elN) elN.textContent = (AppState.offsetN >= 0 ? '+' : '') + AppState.offsetN.toFixed(1) + " m";
+    const formattedE = (AppState.offsetE >= 0 ? '+' : '') + AppState.offsetE.toFixed(1) + "m";
+    const formattedN = (AppState.offsetN >= 0 ? '+' : '') + AppState.offsetN.toFixed(1) + "m";
 
-    const badge = document.getElementById('badge-offset-summary');
-    if (badge) {
-        badge.textContent = `${(AppState.offsetE >= 0 ? '+' : '') + AppState.offsetE.toFixed(1)}m, ${(AppState.offsetN >= 0 ? '+' : '') + AppState.offsetN.toFixed(1)}m`;
-    }
+    const elE = document.getElementById('f-val-east');
+    const elN = document.getElementById('f-val-north');
+    if (elE) elE.textContent = formattedE;
+    if (elN) elN.textContent = formattedN;
 
-    const sE = document.getElementById('offset-east');
-    const sN = document.getElementById('offset-north');
+    const sE = document.getElementById('f-offset-east');
+    const sN = document.getElementById('f-offset-north');
     if (sE && parseFloat(sE.value) !== AppState.offsetE) sE.value = AppState.offsetE;
     if (sN && parseFloat(sN.value) !== AppState.offsetN) sN.value = AppState.offsetN;
 
@@ -836,61 +775,26 @@ function updateCounterBadges(notif, sinCarp, noTit, otros) {
     if (elTotal) elTotal.textContent = `${notif} Visibles`;
 }
 
-// ====== ETIQUETAS DINÁMICAS (CORREGIDAS: SIN NADA NEGRO) ======
+// ====== ETIQUETAS DINÁMICAS (EN SINCRONIZACIÓN PERFECTA CON POLÍGONOS) ======
 
 function updateLabels() {
     if (!AppState.labelGroup) return;
+    AppState.labelGroup.clearLayers();
 
-    if (!AppState.showLabels) {
-        AppState.labelGroup.clearLayers();
-        if (AppState.geojsonLayer) {
-            AppState.geojsonLayer.eachLayer(l => {
-                l._labelMarker = null;
-                if (l.eachLayer) l.eachLayer(child => { child._labelMarker = null; });
-            });
-        }
-        return;
-    }
+    if (!AppState.showLabels) return;
 
     const zoom = AppState.map.getZoom();
-    if (zoom < 16) {
-        AppState.labelGroup.clearLayers();
-        if (AppState.geojsonLayer) {
-            AppState.geojsonLayer.eachLayer(l => {
-                l._labelMarker = null;
-                if (l.eachLayer) l.eachLayer(child => { child._labelMarker = null; });
-            });
-        }
-        return; // Limpieza en vista macro
-    }
+    if (zoom < 16) return;
 
-    const bounds = AppState.map.getBounds().pad(0.1);
-    const visibleSet = new Set(AppState.visibleLayers);
-
-    // Limpiar marcadores de capas que ya no están visibles
-    if (AppState.geojsonLayer) {
-        AppState.geojsonLayer.eachLayer(layer => {
-            if (!visibleSet.has(layer) && layer._labelMarker) {
-                AppState.labelGroup.removeLayer(layer._labelMarker);
-                layer._labelMarker = null;
-            }
-        });
-    }
+    const mapBounds = AppState.map.getBounds().pad(0.1);
 
     AppState.visibleLayers.forEach(layer => {
         if (!layer.getBounds) return;
-        const layerBounds = layer.getBounds();
-        const isInView = bounds.intersects(layerBounds);
+        const lbounds = layer.getBounds();
+        if (!mapBounds.intersects(lbounds)) return;
 
-        if (!isInView) {
-            if (layer._labelMarker && AppState.labelGroup.hasLayer(layer._labelMarker)) {
-                AppState.labelGroup.removeLayer(layer._labelMarker);
-            }
-            return;
-        }
-
-        const center = getLayerActualCenter(layer);
-        if (!center) return;
+        const center = lbounds.getCenter();
+        if (!center || isNaN(center.lat) || isNaN(center.lng)) return;
 
         const props = layer.feature ? layer.feature.properties : {};
         const cod = props.COD_PROMUVI || '';
@@ -917,31 +821,13 @@ function updateLabels() {
             className += ' otros';
         }
 
-        const labelKey = `${text}_${className}`;
+        const icon = L.divIcon({
+            className: 'cus-wrapper',
+            html: `<div class="${className}">${text}</div>`,
+            iconSize: [0, 0]
+        });
 
-        if (layer._labelMarker) {
-            layer._labelMarker.setLatLng(center);
-            if (layer._labelKey !== labelKey) {
-                layer._labelKey = labelKey;
-                layer._labelMarker.setIcon(L.divIcon({
-                    className: 'cus-wrapper',
-                    html: `<div class="${className}">${text}</div>`,
-                    iconSize: [0, 0]
-                }));
-            }
-            if (!AppState.labelGroup.hasLayer(layer._labelMarker)) {
-                AppState.labelGroup.addLayer(layer._labelMarker);
-            }
-        } else {
-            layer._labelKey = labelKey;
-            const icon = L.divIcon({
-                className: 'cus-wrapper',
-                html: `<div class="${className}">${text}</div>`,
-                iconSize: [0, 0]
-            });
-            layer._labelMarker = L.marker(center, { icon: icon, interactive: false });
-            AppState.labelGroup.addLayer(layer._labelMarker);
-        }
+        L.marker(center, { icon: icon, interactive: false }).addTo(AppState.labelGroup);
     });
 }
 
@@ -1568,52 +1454,32 @@ function setupEventListeners() {
         loadFondoActivo();
     });
 
-    // 7. WIDGET FLOTANTE: AJUSTE FINO CARTOGRÁFICO (ESQUINA INFERIOR IZQUIERDA)
-    const toggleFineTune = () => {
-        const floatCard = document.getElementById('float-fine-tune');
-        const btn = document.getElementById('btn-toggle-fine-tune');
-        if (floatCard) {
-            floatCard.classList.toggle('minimized');
-            if (btn) btn.textContent = floatCard.classList.contains('minimized') ? '▲' : '▼';
-        }
-    };
-
-    document.getElementById('btn-toggle-fine-tune')?.addEventListener('click', (e) => {
+    // 7. CALIBRACIÓN CARTOGRÁFICA EN L CON ÍCONO DE TUERCA (ESTILO SANEAMIENTO)
+    const toggleBtn = document.getElementById('toggle-l-calibration');
+    const lContainer = document.getElementById('l-axes-container');
+    
+    toggleBtn?.addEventListener('click', (e) => {
         e.stopPropagation();
-        toggleFineTune();
+        if (lContainer) {
+            const isHidden = lContainer.classList.toggle('hidden');
+            toggleBtn.classList.toggle('active', !isHidden);
+            if (!isHidden) {
+                showToast('Calibración cartográfica activa (Ejes L).', 'info', 2000);
+            }
+        }
     });
-    document.getElementById('fine-tune-header')?.addEventListener('click', toggleFineTune);
 
-    document.getElementById('offset-east')?.addEventListener('input', (e) => {
+    document.getElementById('f-offset-east')?.addEventListener('input', (e) => {
         handleOffsetInput(e.target.value, AppState.offsetN);
     });
 
-    document.getElementById('offset-north')?.addEventListener('input', (e) => {
+    document.getElementById('f-offset-north')?.addEventListener('input', (e) => {
         handleOffsetInput(AppState.offsetE, e.target.value);
     });
 
-    document.querySelectorAll('.btn-nudge').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const dir = btn.getAttribute('data-dir');
-            const step = parseFloat(btn.getAttribute('data-step') || 0.5);
-            let e = AppState.offsetE;
-            let n = AppState.offsetN;
-
-            if (dir === 'E') e += step;
-            else if (dir === 'W') e -= step;
-            else if (dir === 'N') n += step;
-            else if (dir === 'S') n -= step;
-
-            e = Math.round(e * 10) / 10;
-            n = Math.round(n * 10) / 10;
-
-            handleOffsetInput(e, n);
-        });
-    });
-
-    document.getElementById('offset-reset')?.addEventListener('click', () => {
+    document.getElementById('f-offset-reset')?.addEventListener('click', () => {
         handleOffsetInput(0, 0);
-        showToast('Ajuste fino restablecido a 0.0 m.', 'info');
+        showToast('Calibración restablecida a 0.0 m.', 'info');
     });
 
     // 8. Selección Espacial

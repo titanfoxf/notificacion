@@ -116,11 +116,9 @@
         display: none;
     }
 
-    #float-fine-tune {
+    .float-calibration-station {
         left: 10px;
         bottom: 10px;
-        width: 250px;
-        max-width: calc(100vw - 20px);
     }
 }
 

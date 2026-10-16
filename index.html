@@ -317,46 +317,44 @@
             <button id="btn-open-help" class="map-tool-btn" title="Información y Ayuda">ℹ️</button>
         </div>
 
-        <!-- Floating Fine Tune Widget on Map (Esquina inferior izquierda) -->
-        <div id="float-fine-tune" class="float-panel fine-tune-float">
-            <div class="fine-tune-header" id="fine-tune-header">
-                <div class="fine-tune-title-wrap">
-                    <span style="font-size: 13px;">🎯</span>
-                    <span class="fine-tune-title">Ajuste Fino</span>
-                    <span id="badge-offset-summary" class="offset-summary-badge">+0.0m, +0.0m</span>
-                </div>
-                <button id="btn-toggle-fine-tune" class="btn-icon-subtle" title="Minimizar / Expandir">▼</button>
-            </div>
-            
-            <div id="fine-tune-body" class="fine-tune-body">
-                <!-- Slider Este -->
-                <div class="fine-tune-row">
-                    <div class="fine-tune-label">
-                        <span>Este (+E / -W):</span>
-                        <span id="val-offset-e" class="valor-verde">+0.0 m</span>
+        <!-- Calibración Cartográfica L-Station (Estilo Visor Saneamiento) -->
+        <div id="float-calibration" class="float-calibration-station">
+            <!-- Botón Tuerca para Ocultar/Mostrar -->
+            <button id="toggle-l-calibration" class="btn-gear-calibration" title="Calibración y Ajuste Fino Cartográfico">
+                ⚙️
+            </button>
+
+            <!-- Contenedor de Ejes en L (Oculto por defecto con clase hidden) -->
+            <div id="l-axes-container" class="l-axes-wrap hidden">
+                <!-- EJE VERTICAL (NORTE / SUR) -->
+                <div class="axis-vertical-box">
+                    <div class="axis-badge">
+                        <span class="axis-name">Y: NORTE / SUR</span>
+                        <span id="f-val-north" class="axis-val">+0.0m</span>
                     </div>
-                    <input type="range" id="offset-east" min="-25" max="25" step="0.1" value="0" class="fine-tune-slider">
-                </div>
-
-                <!-- Slider Norte -->
-                <div class="fine-tune-row">
-                    <div class="fine-tune-label">
-                        <span>Norte (+N / -S):</span>
-                        <span id="val-offset-n" class="valor-verde">+0.0 m</span>
+                    <div class="slider-vertical-wrap">
+                        <span class="axis-limit-top">+N</span>
+                        <input type="range" id="f-offset-north" class="slider-vertical" min="-25" max="25" step="0.1" value="0">
+                        <span class="axis-limit-bottom">-S</span>
                     </div>
-                    <input type="range" id="offset-north" min="-25" max="25" step="0.1" value="0" class="fine-tune-slider">
                 </div>
 
-                <!-- Micro-Ajuste con Botones Rápidos (0.5m) -->
-                <div class="fine-tune-nudges">
-                    <button class="btn-secondary btn-nudge" data-dir="W" data-step="0.5" title="Mover Oeste 0.5m">◀ 0.5m</button>
-                    <button class="btn-secondary btn-nudge" data-dir="E" data-step="0.5" title="Mover Este 0.5m">▶ 0.5m</button>
-                    <button class="btn-secondary btn-nudge" data-dir="S" data-step="0.5" title="Mover Sur 0.5m">▼ 0.5m</button>
-                    <button class="btn-secondary btn-nudge" data-dir="N" data-step="0.5" title="Mover Norte 0.5m">▲ 0.5m</button>
-                </div>
-
-                <div style="display: flex; gap: 6px; margin-top: 4px;">
-                    <button id="offset-reset" class="btn-secondary" style="flex: 1; font-size: 11px; padding: 5px;" title="Restablecer calibración a 0.0m">Restablecer (0.0m)</button>
+                <!-- EJE HORIZONTAL (ESTE / OESTE) + RESET -->
+                <div class="axis-horizontal-box">
+                    <div class="axis-h-row">
+                        <div class="axis-badge">
+                            <span class="axis-name">X: ESTE / OESTE</span>
+                            <span id="f-val-east" class="axis-val">+0.0m</span>
+                        </div>
+                        <button id="f-offset-reset" class="btn-axis-reset" title="Restablecer calibración a 0.0m">
+                            ↺ Reset 0.0m
+                        </button>
+                    </div>
+                    <div class="slider-horizontal-wrap">
+                        <span class="axis-limit-left">-O</span>
+                        <input type="range" id="f-offset-east" class="slider-horizontal" min="-25" max="25" step="0.1" value="0">
+                        <span class="axis-limit-right">+E</span>
+                    </div>
                 </div>
             </div>
         </div>
