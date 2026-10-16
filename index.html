@@ -541,10 +541,14 @@
                     </div>
                     <div id="gas-config-panel" class="hidden" style="margin-top: 8px;">
                         <input type="url" id="field-gas-url" class="styled-input" placeholder="https://script.google.com/macros/s/.../exec" style="width: 100%; font-size: 11px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 10px; flex-wrap: wrap; gap: 6px;">
                             <span style="color: var(--text-dim);">Pega la URL de tu Web App desplegado en Apps Script</span>
-                            <button type="button" id="btn-save-gas-url" class="btn-secondary" style="padding: 4px 10px; font-size: 11px;">Guardar URL</button>
+                            <div style="display: flex; gap: 6px;">
+                                <button type="button" id="btn-test-gas-url" class="btn-secondary" style="padding: 4px 8px; font-size: 11px; color: #38bdf8;">🔍 Probar</button>
+                                <button type="button" id="btn-save-gas-url" class="btn-secondary" style="padding: 4px 10px; font-size: 11px;">Guardar URL</button>
+                            </div>
                         </div>
+                        <div id="gas-test-result" style="font-size: 11px; margin-top: 6px; display: none; padding: 6px 8px; border-radius: 4px;"></div>
                     </div>
                 </div>
             </div>

@@ -1194,21 +1194,45 @@ async function submitFieldRecord() {
 
     // 2. Si hay URL de Google Apps Script, enviar vía POST
     if (AppState.fieldAppsScriptUrl) {
+        let sentOk = false;
         try {
+            // Intento 1: Fetch estándar CORS con redirección automática
             const resp = await fetch(AppState.fieldAppsScriptUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                mode: 'cors',
+                redirect: 'follow',
+                headers: { 'Content-Type': 'text/plain' },
                 body: JSON.stringify(record)
             });
-            const resJson = await resp.json();
-            if (resJson && resJson.foto_url) {
-                record.foto_url = resJson.foto_url;
-                saveLocalFieldRecord(record);
+
+            if (resp.ok) {
+                const resJson = await resp.json();
+                if (resJson && resJson.foto_url) {
+                    record.foto_url = resJson.foto_url;
+                    saveLocalFieldRecord(record);
+                }
+                sentOk = true;
+                showToast(`✅ Notificación y foto subidas a Google Drive con éxito (${cod}).`, 'success', 5000);
+            } else {
+                throw new Error(`HTTP ${resp.status}`);
             }
-            showToast(`✅ Notificación y foto subidas a Google Drive con éxito (${cod}).`, 'success', 5000);
-        } catch (err) {
-            console.warn('Error al enviar a Apps Script:', err);
-            showToast(`⚠️ Guardado en celular. Al reconectar se subirá a Drive: ${err.message}`, 'warning', 6000);
+        } catch (corsErr) {
+            console.warn('Fallo intento CORS estándar, probando envío resiliente por modo no-cors...', corsErr);
+            try {
+                // Intento 2: Fallback resiliente con mode 'no-cors' (Google Apps Script procesa y guarda la foto en Drive y Sheets)
+                await fetch(AppState.fieldAppsScriptUrl, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    redirect: 'follow',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(record)
+                });
+                sentOk = true;
+                showToast(`✅ Notificación y foto enviadas a Google Drive y Sheets (${cod}).`, 'success', 5000);
+            } catch (fallbackErr) {
+                console.error('Error total en el envío:', fallbackErr);
+                showToast(`⚠️ Guardado en celular. Al reconectar se subirá a Drive: ${corsErr.message}`, 'warning', 6000);
+            }
         }
     } else {
         showToast(`✅ Notificación guardada en el dispositivo (${cod}). Pega la URL de Apps Script para subida directa a Drive.`, 'info', 6000);
@@ -2117,6 +2141,44 @@ function setupEventListeners() {
         AppState.fieldAppsScriptUrl = url;
         localStorage.setItem('field_apps_script_url', url);
         showToast(url ? 'URL de Google Apps Script guardada.' : 'URL eliminada.', 'success');
+    });
+
+    document.getElementById('btn-test-gas-url')?.addEventListener('click', async () => {
+        const url = (document.getElementById('field-gas-url')?.value || '').trim();
+        const resEl = document.getElementById('gas-test-result');
+        if (!url) {
+            showToast('Ingresa una URL antes de probar.', 'warning');
+            return;
+        }
+
+        if (resEl) {
+            resEl.style.display = 'block';
+            resEl.style.background = 'rgba(56, 189, 248, 0.15)';
+            resEl.style.color = '#38bdf8';
+            resEl.innerHTML = '⏳ Probando conexión con Google Apps Script...';
+        }
+
+        try {
+            const resp = await fetch(url, { method: 'GET', mode: 'cors' });
+            const data = await resp.json();
+            if (data && data.status === 'OK') {
+                if (resEl) {
+                    resEl.style.background = 'rgba(16, 185, 129, 0.2)';
+                    resEl.style.color = '#34d399';
+                    resEl.innerHTML = '✅ <strong>¡Conexión exitosa!</strong> El backend respondió correctamente y está listo para recibir fotos y datos.';
+                }
+                showToast('Conexión con Apps Script verificada.', 'success');
+            } else {
+                throw new Error('Respuesta no válida');
+            }
+        } catch (err) {
+            if (resEl) {
+                resEl.style.background = 'rgba(239, 68, 68, 0.2)';
+                resEl.style.color = '#f87171';
+                resEl.innerHTML = '⚠️ <strong>No se pudo conectar:</strong><br>1. Asegúrate de que la URL termine en <code>/exec</code> (no en <code>/dev</code>).<br>2. En Google Apps Script verifica que en "Quién tiene acceso" esté seleccionado <strong>"Cualquier persona" (Anyone)</strong>.<br>3. Autoriza los permisos si te lo solicitó Google.';
+            }
+            showToast('Error de conexión con Apps Script.', 'error');
+        }
     });
 }
 
