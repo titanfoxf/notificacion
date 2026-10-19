@@ -53,7 +53,7 @@ const AppState = {
     dataFondo1: null,
     dataFondo2: null,
     dataFondo3: null,
-    fondoActivo: 'fondo1',      // 'fondo1' | 'fondo2' | 'fondo3' | 'ninguno'
+    fondoActivo: 'ninguno',     // 'fondo1' | 'fondo2' | 'fondo3' | 'ninguno' (por defecto ninguno para máxima fluidez móvil)
     fondoOpacidad: 0.50,
     fondoColor: '#00e5ff',
     isFondoInteractive: false,
@@ -179,7 +179,8 @@ function initMap() {
         center: initialCenter,
         zoom: 17,
         maxZoom: 22,
-        zoomControl: false
+        zoomControl: false,
+        preferCanvas: true
     });
 
     // Control de Zoom en posición top-right
@@ -387,6 +388,36 @@ async function loadAllData() {
 
 // ====== MOTOR DE FONDOS CARTOGRÁFICOS ======
 
+function isFeatureNearSubsector(feature) {
+    if (!feature || !feature.geometry) return false;
+    const geom = feature.geometry;
+    const coords = geom.coordinates;
+    if (!coords || coords.length === 0) return false;
+
+    let pt = null;
+    if (geom.type === 'Polygon' && coords[0] && coords[0][0]) {
+        pt = coords[0][0];
+    } else if (geom.type === 'MultiPolygon' && coords[0] && coords[0][0] && coords[0][0][0]) {
+        pt = coords[0][0][0];
+    } else if (geom.type === 'Point') {
+        pt = coords;
+    } else if (geom.type === 'LineString' && coords[0]) {
+        pt = coords[0];
+    }
+    if (!pt || !Array.isArray(pt) || pt.length < 2) return true;
+
+    const lng = pt[0];
+    const lat = pt[1];
+
+    if (AppState.subsectorBounds && typeof AppState.subsectorBounds.pad === 'function') {
+        // Buffer de 1.5x (~1.5 km alrededor del subsector) para contextualizar sin sobrecargar la GPU del móvil
+        return AppState.subsectorBounds.pad(1.5).contains([lat, lng]);
+    }
+
+    // Coordenadas aproximadas de Chen Chen y entorno de Subsector 1A-4
+    return (lat >= -17.225 && lat <= -17.175 && lng >= -70.955 && lng <= -70.900);
+}
+
 async function loadFondoActivo() {
     if (AppState.fondoActivo === 'ninguno') {
         AppState.capaFondoGroup.clearLayers();
@@ -418,8 +449,12 @@ async function loadFondoActivo() {
 
     AppState.capaFondoGroup.clearLayers();
 
+    const fondoRenderer = L.canvas({ pane: 'paneCapaFondo', padding: 0.5 });
+
     const fondoLayer = L.geoJSON(data, {
         pane: 'paneCapaFondo',
+        renderer: fondoRenderer,
+        filter: (feature) => isFeatureNearSubsector(feature),
         style: () => ({
             color: AppState.fondoColor,
             weight: 1.2,
