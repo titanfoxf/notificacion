@@ -309,42 +309,28 @@
 
         <!-- Calibración Cartográfica L-Station (Estilo Visor Saneamiento) -->
         <div id="float-calibration" class="float-calibration-station">
-            <!-- Botón Tuerca para Ocultar/Mostrar -->
+            <!-- Botón Tuerca en Esquina Inferior Izquierda -->
             <button id="toggle-l-calibration" class="btn-gear-calibration" title="Calibración y Ajuste Fino Cartográfico">
                 ⚙️
             </button>
 
-            <!-- Contenedor de Ejes en L (Oculto por defecto con clase hidden) -->
-            <div id="l-axes-container" class="l-axes-wrap hidden">
-                <!-- EJE VERTICAL (NORTE / SUR) -->
-                <div class="axis-vertical-box">
-                    <span id="f-val-north" class="axis-val">+0.0m</span>
-                    <div class="axis-v-content">
-                        <span class="axis-name-vertical">Y: NORTE / SUR</span>
-                        <div class="slider-vertical-wrap">
-                            <span class="axis-limit-top">+N</span>
-                            <input type="range" id="f-offset-north" class="slider-vertical" min="-25" max="25" step="0.1" value="0">
-                            <span class="axis-limit-bottom">-S</span>
-                        </div>
-                    </div>
+            <!-- Contenedor HUD de Ejes en L -->
+            <div id="l-axes-container" class="l-axes-hud">
+                <!-- Botón Reset XY justo encima de la tuerca -->
+                <button id="f-offset-reset" class="btn-reset-xy" title="Restablecer calibración XY a 0.0m">
+                    Reset XY
+                </button>
+
+                <!-- EJE VERTICAL Y (NORTE / SUR) - HUD borde izquierdo -->
+                <div class="hud-axis-y-wrap">
+                    <span class="hud-axis-y-label">EJE Y (NORTE / SUR)</span>
+                    <input type="range" id="f-offset-north" class="hud-slider-v" orient="vertical" min="-25" max="25" step="0.1" value="0">
                 </div>
 
-                <!-- EJE HORIZONTAL (ESTE / OESTE) + RESET -->
-                <div class="axis-horizontal-box">
-                    <div class="axis-h-row">
-                        <div class="axis-badge">
-                            <span class="axis-name">X: ESTE / OESTE</span>
-                            <span id="f-val-east" class="axis-val">+0.0m</span>
-                        </div>
-                        <button id="f-offset-reset" class="btn-axis-reset" title="Restablecer calibración a 0.0m">
-                            ↺ Reset 0.0m
-                        </button>
-                    </div>
-                    <div class="slider-horizontal-wrap">
-                        <span class="axis-limit-left">-O</span>
-                        <input type="range" id="f-offset-east" class="slider-horizontal" min="-25" max="25" step="0.1" value="0">
-                        <span class="axis-limit-right">+E</span>
-                    </div>
+                <!-- EJE HORIZONTAL X (ESTE / OESTE) - HUD borde inferior -->
+                <div class="hud-axis-x-wrap">
+                    <span class="hud-axis-x-label">EJE X (ESTE / OESTE)</span>
+                    <input type="range" id="f-offset-east" class="hud-slider-h" min="-25" max="25" step="0.1" value="0">
                 </div>
             </div>
         </div>

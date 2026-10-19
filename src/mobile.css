@@ -117,9 +117,10 @@
     }
 
     .float-calibration-station {
-        left: 12px;
-        bottom: 24px;
+        position: absolute;
+        inset: 0;
         z-index: 1200;
+        pointer-events: none;
     }
 
     #map-container {
@@ -128,8 +129,9 @@
     }
 
     .basemap-floating-panel {
-        top: 14px;
-        left: 60px;
+        top: 70px;
+        right: 58px;
+        left: auto;
         width: calc(100vw - 80px);
         max-width: 260px;
     }
@@ -150,9 +152,9 @@
     }
 
     #float-map-tools {
-        top: 10px;
-        left: 10px;
-        right: auto;
+        top: 70px;
+        right: 10px;
+        left: auto;
         gap: 7px;
     }
 
@@ -163,8 +165,9 @@
     }
 
     .basemap-floating-panel {
-        top: 10px;
-        left: 58px;
+        top: 70px;
+        right: 56px;
+        left: auto;
         width: calc(100vw - 72px);
         max-width: 255px;
     }

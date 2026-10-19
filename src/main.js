@@ -177,7 +177,7 @@ function initMap() {
 
     AppState.map = L.map('map', {
         center: initialCenter,
-        zoom: 17,
+        zoom: 16,
         maxZoom: 22,
         zoomControl: false,
         preferCanvas: true
@@ -388,34 +388,58 @@ async function loadAllData() {
 
 // ====== MOTOR DE FONDOS CARTOGRÁFICOS ======
 
-function isFeatureNearSubsector(feature) {
-    if (!feature || !feature.geometry) return false;
-    const geom = feature.geometry;
-    const coords = geom.coordinates;
-    if (!coords || coords.length === 0) return false;
+function pruneFondoToNearSubsector(rawGeoJson) {
+    if (!rawGeoJson || !rawGeoJson.features) return rawGeoJson;
 
-    let pt = null;
-    if (geom.type === 'Polygon' && coords[0] && coords[0][0]) {
-        pt = coords[0][0];
-    } else if (geom.type === 'MultiPolygon' && coords[0] && coords[0][0] && coords[0][0][0]) {
-        pt = coords[0][0][0];
-    } else if (geom.type === 'Point') {
-        pt = coords;
-    } else if (geom.type === 'LineString' && coords[0]) {
-        pt = coords[0];
-    }
-    if (!pt || !Array.isArray(pt) || pt.length < 2) return true;
-
-    const lng = pt[0];
-    const lat = pt[1];
-
+    let boundsFilter = null;
     if (AppState.subsectorBounds && typeof AppState.subsectorBounds.pad === 'function') {
-        // Buffer de 1.5x (~1.5 km alrededor del subsector) para contextualizar sin sobrecargar la GPU del móvil
-        return AppState.subsectorBounds.pad(1.5).contains([lat, lng]);
+        boundsFilter = AppState.subsectorBounds.pad(1.2);
     }
 
-    // Coordenadas aproximadas de Chen Chen y entorno de Subsector 1A-4
-    return (lat >= -17.225 && lat <= -17.175 && lng >= -70.955 && lng <= -70.900);
+    const minLat = boundsFilter ? boundsFilter.getSouth() : -17.215;
+    const maxLat = boundsFilter ? boundsFilter.getNorth() : -17.190;
+    const minLng = boundsFilter ? boundsFilter.getWest() : -70.940;
+    const maxLng = boundsFilter ? boundsFilter.getEast() : -70.915;
+
+    const kept = [];
+    const totalOriginal = rawGeoJson.features.length;
+
+    for (let i = 0; i < totalOriginal; i++) {
+        const f = rawGeoJson.features[i];
+        if (!f || !f.geometry) continue;
+        const geom = f.geometry;
+        const coords = geom.coordinates;
+        if (!coords || coords.length === 0) continue;
+
+        let pt = null;
+        if (geom.type === 'Polygon' && coords[0] && coords[0][0]) {
+            pt = coords[0][0];
+        } else if (geom.type === 'MultiPolygon' && coords[0] && coords[0][0] && coords[0][0][0]) {
+            pt = coords[0][0][0];
+        } else if (geom.type === 'Point') {
+            pt = coords;
+        } else if (geom.type === 'LineString' && coords[0]) {
+            pt = coords[0];
+        }
+
+        if (!pt || !Array.isArray(pt) || pt.length < 2) continue;
+
+        const lng = pt[0];
+        const lat = pt[1];
+
+        if (lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng) {
+            kept.push(f);
+        }
+    }
+
+    // Vaciar explícitamente el array original para que el recolector de basura libere los 19MB de RAM inmediatamente
+    rawGeoJson.features.length = 0;
+    console.log(`[Fondo Optimizado] Descartados ${totalOriginal - kept.length} polígonos lejanos. Cargados solo ${kept.length} en memoria.`);
+
+    return {
+        type: 'FeatureCollection',
+        features: kept
+    };
 }
 
 async function loadFondoActivo() {
@@ -427,25 +451,28 @@ async function loadFondoActivo() {
     let data = null;
     if (AppState.fondoActivo === 'fondo1') {
         if (!AppState.dataFondo1) {
-            showToast('Cargando Fondo 1...', 'info');
-            AppState.dataFondo1 = await fetchJsonSafe('./Fondo.json');
+            showToast('Optimizando Fondo 1 para memoria móvil...', 'info', 2000);
+            const raw = await fetchJsonSafe('./Fondo.json');
+            AppState.dataFondo1 = pruneFondoToNearSubsector(raw);
         }
         data = AppState.dataFondo1;
     } else if (AppState.fondoActivo === 'fondo2') {
         if (!AppState.dataFondo2) {
-            showToast('Descargando Fondo 2...', 'info');
-            AppState.dataFondo2 = await fetchJsonSafe('./Fondo2.json');
+            showToast('Descargando Fondo 2...', 'info', 2000);
+            const raw = await fetchJsonSafe('./Fondo2.json');
+            AppState.dataFondo2 = pruneFondoToNearSubsector(raw);
         }
         data = AppState.dataFondo2;
     } else if (AppState.fondoActivo === 'fondo3') {
         if (!AppState.dataFondo3) {
-            showToast('Descargando Fondo 3...', 'info');
-            AppState.dataFondo3 = await fetchJsonSafe('./Fondo3.json');
+            showToast('Descargando Fondo 3...', 'info', 2000);
+            const raw = await fetchJsonSafe('./Fondo3.json');
+            AppState.dataFondo3 = pruneFondoToNearSubsector(raw);
         }
         data = AppState.dataFondo3;
     }
 
-    if (!data) return;
+    if (!data || !data.features || data.features.length === 0) return;
 
     AppState.capaFondoGroup.clearLayers();
 
@@ -454,7 +481,6 @@ async function loadFondoActivo() {
     const fondoLayer = L.geoJSON(data, {
         pane: 'paneCapaFondo',
         renderer: fondoRenderer,
-        filter: (feature) => isFeatureNearSubsector(feature),
         style: () => ({
             color: AppState.fondoColor,
             weight: 1.2,
@@ -623,6 +649,11 @@ function handleOffsetInput(eastMeters, northMeters) {
     if (elE) elE.textContent = formattedE;
     if (elN) elN.textContent = formattedN;
 
+    const lblY = document.querySelector('.hud-axis-y-label');
+    const lblX = document.querySelector('.hud-axis-x-label');
+    if (lblY) lblY.textContent = `EJE Y (NORTE / SUR) ${formattedN}`;
+    if (lblX) lblX.textContent = `EJE X (ESTE / OESTE) ${formattedE}`;
+
     const sE = document.getElementById('f-offset-east');
     const sN = document.getElementById('f-offset-north');
     if (sE && parseFloat(sE.value) !== AppState.offsetE) sE.value = AppState.offsetE;
@@ -743,8 +774,8 @@ function buildVectorLayer() {
 
     AppState.subsectorBounds = AppState.geojsonLayer.getBounds();
     AppState.map.fitBounds(AppState.subsectorBounds, { 
-        padding: isMobile() ? [15, 15] : [30, 30],
-        maxZoom: 18,
+        padding: isMobile() ? [25, 25] : [45, 45],
+        maxZoom: 16,
         animate: false 
     });
 
@@ -2120,8 +2151,8 @@ function setupEventListeners() {
 
         const isMob = isMobile();
         AppState.map.fitBounds(AppState.subsectorBounds, {
-            padding: isMob ? [15, 15] : [30, 30],
-            maxZoom: 18,
+            padding: isMob ? [25, 25] : [45, 45],
+            maxZoom: 16,
             animate: true,
             duration: isMob ? 0.35 : 0.6
         });
