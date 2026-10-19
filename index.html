@@ -185,8 +185,8 @@
                 
                 <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; border-top: 1px solid var(--glass-border); padding-top: 8px;">
                     <span style="color: var(--text-muted);">Opacidad Fondo:</span>
-                    <span id="val-fondo-opacidad" style="color: #00e5ff; font-weight: 700;">30%</span>
-                    <input type="range" id="sliderFondoOpacidad" min="0" max="100" value="30" style="width: 110px; accent-color: #00e5ff;">
+                    <span id="val-fondo-opacidad" style="color: #00e5ff; font-weight: 700;">50%</span>
+                    <input type="range" id="sliderFondoOpacidad" min="0" max="100" value="50" style="width: 110px; accent-color: #00e5ff;">
                 </div>
 
                 <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
@@ -196,69 +196,18 @@
 
                 <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 6px;">
                     <label style="color: #e2e8f0; font-size: 11px; display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;" title="Permite hacer clic en la capa de fondo para consultar sus partidas registrales">
-                        <input type="checkbox" id="chkInfoFondo" checked style="accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer;"> Consultar datos de fondo al hacer clic
+                        <input type="checkbox" id="chkInfoFondo" style="accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer;"> Consultar datos de fondo al hacer clic
                     </label>
                 </div>
-            </div>
-        </div>
-
-
-        <!-- Selección Espacial (Point in Polygon) -->
-        <div class="tool-section">
-            <label class="section-label">Selección Espacial en Mapa</label>
-            <div style="display: flex; gap: 6px;">
-                <button id="btnDrawStart" class="btn-primary" style="flex: 1.2; font-size: 11px; padding: 8px;">✏️ DIBUJAR ÁREA</button>
-                <button id="btnDrawFilter" class="btn-primary hidden" style="flex: 1; background: #10b981; font-size: 11px; padding: 8px;">✅ FILTRAR</button>
-                <button id="btnDrawClear" class="btn-secondary hidden" style="flex: 1; font-size: 11px; padding: 8px;">🧹 LIMPIAR</button>
-            </div>
-            <div id="draw-status" style="font-size: 10px; color: #34d399; margin-top: 6px; display: none; text-align: center; font-weight: 600;">
-                Haga clics en el mapa para añadir vértices del área.
             </div>
         </div>
 
         <!-- Exportaciones Masivas -->
         <div class="tool-section">
             <label class="section-label">Exportar Cartografía & Padrón</label>
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;">
-                <button id="btnExportCAD" class="btn-primary" style="background: #e11d48; font-size: 11px; padding: 8px 4px;" title="Descargar vectores en AutoCAD DXF (UTM 19S)">
-                    📐 CAD .DXF
-                </button>
-                <button id="btnExportKML" class="btn-primary" style="background: #059669; font-size: 11px; padding: 8px 4px;" title="Descargar capa para Google Earth con datos extendidos">
-                    🌍 KML
-                </button>
-                <button id="btnExportExcel" class="btn-primary" style="background: #15803d; font-size: 11px; padding: 8px 4px;" title="Descargar Padrón y Coordenadas en Excel">
-                    📗 EXCEL
-                </button>
-            </div>
-        </div>
-
-        <!-- Etiquetas (Leyendas) en Lotes -->
-        <div class="tool-section">
-            <label class="section-label">Etiquetas / Leyendas de Predio</label>
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-                <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; cursor: pointer;">
-                    <input type="checkbox" id="chkShowLabels" checked style="accent-color: var(--accent);">
-                    <span>Mostrar Etiquetas en Lotes</span>
-                </label>
-                
-                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
-                    <span style="color: var(--text-muted);">Texto a mostrar:</span>
-                    <select id="labelFieldSelect" class="styled-select" style="width: 180px; font-size: 11px; padding: 4px 6px;">
-                        <option value="COD_PROMUVI">Código Promuvi (Ej: 1A-4_B_08)</option>
-                        <option value="MZ_LOTE">Manzana y Lote (Ej: Mz B Lt 8)</option>
-                        <option value="ESTADO">Estado de Notificación</option>
-                        <option value="TITULAR">Nombre del Titular</option>
-                    </select>
-                </div>
-
-                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
-                    <span style="color: var(--text-muted);">Estilo de Texto:</span>
-                    <select id="labelStyleSelect" class="styled-select" style="width: 180px; font-size: 11px; padding: 4px 6px;">
-                        <option value="halo" selected>Texto Limpio con Halo (Sin Fondo)</option>
-                        <option value="pill">Badge Translúcido Suave</option>
-                    </select>
-                </div>
-            </div>
+            <button id="btnExportKML" class="btn-primary" style="background: #059669; font-size: 11px; padding: 10px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700;" title="Descargar capa para Google Earth con datos extendidos">
+                🌍 EXPORTAR KML (GOOGLE EARTH)
+            </button>
         </div>
 
         <!-- Estilos de Borde de Polígonos -->
@@ -282,19 +231,6 @@
             </div>
         </div>
 
-        <!-- Selector de Mapa Base -->
-        <div class="tool-section">
-            <label class="section-label">Mapa Base</label>
-            <select id="baseMapSelect" class="styled-select">
-                <option value="google-hybrid">Google Satélite Híbrido</option>
-                <option value="google-sat">Google Satélite Puro</option>
-                <option value="esri-sat">Esri World Imagery</option>
-                <option value="esri-dark">Esri Dark Canvas (Sin marca)</option>
-                <option value="osm">OpenStreetMap</option>
-                <option value="carto-dark">CartoDB Dark Matter</option>
-            </select>
-        </div>
-
         <div style="text-align: center; margin-top: auto; padding-top: 12px; font-size: 10px; color: var(--text-dim);">
             Subsector 1A-4 • Catastro Promuvi Moquegua
         </div>
@@ -315,7 +251,59 @@
             <button id="btn-gps-locate" class="map-tool-btn" title="Mi Ubicación GPS en Campo">📍</button>
             <button id="btn-recenter" class="map-tool-btn" title="Centrar en Subsector 1A-4">🎯</button>
             <button id="btn-toggle-labels-map" class="map-tool-btn active" title="Alternar Etiquetas">🏷️</button>
-            <button id="btn-open-help" class="map-tool-btn" title="Información y Ayuda">ℹ️</button>
+            <button id="btn-basemap-toggle" class="map-tool-btn" title="Cambiar Mapa Base">🗺️</button>
+        </div>
+
+        <!-- Selector Flotante de Mapa Base en el Visor -->
+        <div id="basemap-floating-panel" class="basemap-floating-panel hidden">
+            <div class="basemap-panel-header">
+                <span style="font-weight: 700; font-size: 11.5px; color: #38bdf8; display: flex; align-items: center; gap: 5px;">🗺️ Capa de Mapa Base</span>
+                <button id="btn-close-basemap" class="btn-close-mini" title="Cerrar">✕</button>
+            </div>
+            <div class="basemap-options-list">
+                <button class="basemap-item active" data-map="google-hybrid">
+                    <span class="basemap-emoji">🛰️</span>
+                    <div class="basemap-desc">
+                        <span class="basemap-title">Google Satélite Híbrido</span>
+                        <span class="basemap-sub">Satélite con vías y nombres</span>
+                    </div>
+                </button>
+                <button class="basemap-item" data-map="google-sat">
+                    <span class="basemap-emoji">🛰️</span>
+                    <div class="basemap-desc">
+                        <span class="basemap-title">Google Satélite Puro</span>
+                        <span class="basemap-sub">Fotografía aérea limpia</span>
+                    </div>
+                </button>
+                <button class="basemap-item" data-map="esri-sat">
+                    <span class="basemap-emoji">🌍</span>
+                    <div class="basemap-desc">
+                        <span class="basemap-title">Esri World Imagery</span>
+                        <span class="basemap-sub">Satélite alta resolución</span>
+                    </div>
+                </button>
+                <button class="basemap-item" data-map="esri-dark">
+                    <span class="basemap-emoji">🌑</span>
+                    <div class="basemap-desc">
+                        <span class="basemap-title">Esri Dark Canvas</span>
+                        <span class="basemap-sub">Gris oscuro sin marcas</span>
+                    </div>
+                </button>
+                <button class="basemap-item" data-map="osm">
+                    <span class="basemap-emoji">🗺️</span>
+                    <div class="basemap-desc">
+                        <span class="basemap-title">OpenStreetMap</span>
+                        <span class="basemap-sub">Callejero vectorial estándar</span>
+                    </div>
+                </button>
+                <button class="basemap-item" data-map="carto-dark">
+                    <span class="basemap-emoji">🌃</span>
+                    <div class="basemap-desc">
+                        <span class="basemap-title">CartoDB Dark Matter</span>
+                        <span class="basemap-sub">Fondo oscuro de alto contraste</span>
+                    </div>
+                </button>
+            </div>
         </div>
 
         <!-- Calibración Cartográfica L-Station (Estilo Visor Saneamiento) -->

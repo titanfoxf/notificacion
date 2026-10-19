@@ -54,9 +54,9 @@ const AppState = {
     dataFondo2: null,
     dataFondo3: null,
     fondoActivo: 'fondo1',      // 'fondo1' | 'fondo2' | 'fondo3' | 'ninguno'
-    fondoOpacidad: 0.30,
+    fondoOpacidad: 0.50,
     fondoColor: '#00e5ff',
-    isFondoInteractive: true,
+    isFondoInteractive: false,
 
     // Filtros
     modo: 'ESTADO',             // 'ESTADO' | 'ASOCIACION' | 'MASIVO'
@@ -83,12 +83,13 @@ const AppState = {
 
     // Etiquetas / Leyendas
     showLabels: true,
-    labelField: 'COD_PROMUVI',
-    labelStyle: 'halo',         // 'halo' | 'pill'
+    labelField: 'MZ_LOTE',
+    labelStyle: 'halo',         // Texto Limpio con Halo fijo
 
-    // Capas visibles activas
+    // Capas visibles activas y límites cacheados
     visibleLayers: [],
     highlightedLayer: null,
+    subsectorBounds: null,
 
     // Recopilación en Campo (Fotos y Notificaciones a Google Drive / Sheets)
     fieldAppsScriptUrl: localStorage.getItem('field_apps_script_url') || '',
@@ -189,34 +190,45 @@ function initMap() {
     AppState.map.createPane('paneCapaFondo');
     AppState.map.getPane('paneCapaFondo').style.zIndex = 350;
 
-    // Definición de Mapas Base
+    // Definición de Mapas Base optimizados para fluidez móvil
+    const tileOptions = {
+        keepBuffer: 3,
+        updateWhenIdle: true
+    };
+
     AppState.baseLayers = {
         'google-hybrid': L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
             maxZoom: 22,
             maxNativeZoom: 20,
-            attribution: '© Google Satellite'
+            attribution: '© Google Satellite',
+            ...tileOptions
         }),
         'google-sat': L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
             maxZoom: 22,
             maxNativeZoom: 20,
-            attribution: '© Google Satellite'
+            attribution: '© Google Satellite',
+            ...tileOptions
         }),
         'esri-sat': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 22,
             maxNativeZoom: 19,
-            attribution: '© Esri World Imagery'
+            attribution: '© Esri World Imagery',
+            ...tileOptions
         }),
         'esri-dark': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 19,
-            attribution: '© Esri Dark Gray'
+            attribution: '© Esri Dark Gray',
+            ...tileOptions
         }),
         'osm': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
-            attribution: '© OpenStreetMap'
+            attribution: '© OpenStreetMap',
+            ...tileOptions
         }),
         'carto-dark': L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
             maxZoom: 20,
-            attribution: '© CartoDB Dark Matter'
+            attribution: '© CartoDB Dark Matter',
+            ...tileOptions
         })
     };
 
@@ -227,29 +239,31 @@ function initMap() {
     AppState.capaFondoGroup = L.layerGroup([], { pane: 'paneCapaFondo' }).addTo(AppState.map);
     AppState.labelGroup = L.layerGroup().addTo(AppState.map);
 
-    // Inicializar Motor de Selección Espacial
-    AppState.spatialDrawer = new LeafletSpatialDrawer(AppState.map, {
-        onPointAdded: (count) => {
-            const st = document.getElementById('draw-status');
-            if (st) {
-                st.style.display = 'block';
-                st.textContent = `Vértice ${count} añadido. Doble clic para cerrar área.`;
+    // Inicializar Motor de Selección Espacial solo si está activo en la interfaz
+    if (document.getElementById('btnDrawStart')) {
+        AppState.spatialDrawer = new LeafletSpatialDrawer(AppState.map, {
+            onPointAdded: (count) => {
+                const st = document.getElementById('draw-status');
+                if (st) {
+                    st.style.display = 'block';
+                    st.textContent = `Vértice ${count} añadido. Doble clic para cerrar área.`;
+                }
+            },
+            onComplete: (points) => {
+                document.getElementById('btnDrawStart')?.classList.remove('hidden');
+                document.getElementById('btnDrawFilter')?.classList.remove('hidden');
+                document.getElementById('btnDrawClear')?.classList.remove('hidden');
+                const st = document.getElementById('draw-status');
+                if (st) st.textContent = `Área cerrada con ${points.length} vértices. Clic en FILTRAR.`;
+            },
+            onClear: () => {
+                document.getElementById('btnDrawFilter')?.classList.add('hidden');
+                document.getElementById('btnDrawClear')?.classList.add('hidden');
+                const st = document.getElementById('draw-status');
+                if (st) st.style.display = 'none';
             }
-        },
-        onComplete: (points) => {
-            document.getElementById('btnDrawStart')?.classList.remove('hidden');
-            document.getElementById('btnDrawFilter')?.classList.remove('hidden');
-            document.getElementById('btnDrawClear')?.classList.remove('hidden');
-            const st = document.getElementById('draw-status');
-            if (st) st.textContent = `Área cerrada con ${points.length} vértices. Clic en FILTRAR.`;
-        },
-        onClear: () => {
-            document.getElementById('btnDrawFilter')?.classList.add('hidden');
-            document.getElementById('btnDrawClear')?.classList.add('hidden');
-            const st = document.getElementById('draw-status');
-            if (st) st.style.display = 'none';
-        }
-    });
+        });
+    }
 
     // Eventos de movimiento en el mapa para refrescar etiquetas
     AppState.map.on('moveend', () => {
@@ -537,6 +551,11 @@ function applyOffsetInRealTime() {
             layer._bounds._southWest.lng = layer._origBounds.southWest.lng + dLng;
             layer._bounds._northEast.lat = layer._origBounds.northEast.lat + dLat;
             layer._bounds._northEast.lng = layer._origBounds.northEast.lng + dLng;
+
+            layer._cachedBounds = layer.getBounds ? layer.getBounds() : layer._bounds;
+            if (layer._cachedBounds) {
+                layer._cachedCenter = layer._cachedBounds.getCenter();
+            }
         }
 
         if (layer.redraw) {
@@ -546,6 +565,7 @@ function applyOffsetInRealTime() {
 
     if (AppState.geojsonLayer) {
         AppState.geojsonLayer.eachLayer(shiftLayer);
+        AppState.subsectorBounds = AppState.geojsonLayer.getBounds();
     }
 
     if (AppState.capaFondoGroup) {
@@ -641,6 +661,12 @@ function buildVectorLayer() {
     AppState.geojsonLayer = L.geoJSON(AppState.rawGeoJSON, {
         style: (feature) => getFeatureStyle(feature),
         onEachFeature: (feature, layer) => {
+            // Pre-cachear bounds y center para acelerar drásticamente updateLabels y recenter en móviles
+            if (layer.getBounds) {
+                layer._cachedBounds = layer.getBounds();
+                layer._cachedCenter = layer._cachedBounds.getCenter();
+            }
+
             const cod = feature.properties.COD_PROMUVI || '';
             const sheetData = AppState.dbSheet.get(cod.toUpperCase()) || AppState.dbSheet.get(normCode(cod));
 
@@ -674,12 +700,18 @@ function buildVectorLayer() {
 
             layer.on('dblclick', (e) => {
                 L.DomEvent.stop(e);
-                AppState.map.fitBounds(layer.getBounds(), { padding: [50, 50], maxZoom: 20 });
+                const b = layer._cachedBounds || layer.getBounds();
+                AppState.map.fitBounds(b, { padding: [50, 50], maxZoom: 20 });
             });
         }
     }).addTo(AppState.map);
 
-    AppState.map.fitBounds(AppState.geojsonLayer.getBounds(), { padding: [30, 30] });
+    AppState.subsectorBounds = AppState.geojsonLayer.getBounds();
+    AppState.map.fitBounds(AppState.subsectorBounds, { 
+        padding: isMobile() ? [15, 15] : [30, 30],
+        maxZoom: 18,
+        animate: false 
+    });
 
     if (AppState.offsetE !== 0 || AppState.offsetN !== 0) {
         applyOffsetInRealTime();
@@ -787,42 +819,50 @@ function updateCounterBadges(notif, sinCarp, noTit, otros) {
 
 // ====== ETIQUETAS DINÁMICAS (EN SINCRONIZACIÓN PERFECTA CON POLÍGONOS) ======
 
+let labelRafId = null;
+
 function updateLabels() {
+    if (labelRafId) cancelAnimationFrame(labelRafId);
+    labelRafId = requestAnimationFrame(doUpdateLabels);
+}
+
+function doUpdateLabels() {
     if (!AppState.labelGroup) return;
     AppState.labelGroup.clearLayers();
 
     if (!AppState.showLabels) return;
 
     const zoom = AppState.map.getZoom();
-    if (zoom < 16) return;
+    const minZoom = isMobile() ? 17 : 16;
+    if (zoom < minZoom) return;
 
     const mapBounds = AppState.map.getBounds().pad(0.1);
 
     AppState.visibleLayers.forEach(layer => {
-        if (!layer.getBounds) return;
-        const lbounds = layer.getBounds();
-        if (!mapBounds.intersects(lbounds)) return;
+        const lbounds = layer._cachedBounds || (layer.getBounds ? layer.getBounds() : null);
+        if (!lbounds || !mapBounds.intersects(lbounds)) return;
 
-        const center = lbounds.getCenter();
+        const center = layer._cachedCenter || (lbounds.getCenter ? lbounds.getCenter() : null);
         if (!center || isNaN(center.lat) || isNaN(center.lng)) return;
 
         const props = layer.feature ? layer.feature.properties : {};
         const cod = props.COD_PROMUVI || '';
         const sheetData = AppState.dbSheet.get(cod.toUpperCase()) || AppState.dbSheet.get(normCode(cod));
 
-        let text = cod;
-        let className = 'lot-label-marker';
-        if (AppState.labelStyle === 'pill') {
-            className += ' style-pill';
+        // Siempre por manzana y lote (Ej: Mz B Lt 8)
+        let mz = props.MANZANA || '';
+        let lt = props.LOTE || '';
+        if (!mz || !lt) {
+            const parts = (cod || '').split('_');
+            if (parts.length >= 3) {
+                mz = mz || parts[1];
+                lt = lt || parts[2];
+            }
         }
+        const text = (mz && lt) ? `Mz ${mz} Lt ${lt}` : (cod || 'PREDIO');
 
-        if (AppState.labelField === 'MZ_LOTE') {
-            text = `Mz ${props.MANZANA || '-'}-${props.LOTE || '-'}`;
-        } else if (AppState.labelField === 'ESTADO') {
-            text = sheetData ? sheetData.ESTADO : 'OTROS';
-        } else if (AppState.labelField === 'TITULAR') {
-            text = (sheetData && sheetData.TITULAR_1) ? sheetData.TITULAR_1.split(' ')[0] : cod;
-        }
+        // Estilo fijo en Texto Limpio con Halo (Sin Fondo)
+        let className = 'lot-label-marker';
 
         if (sheetData) {
             if (sheetData.ESTADO.includes('SIN CARPETA')) className += ' sin-carpeta';
@@ -1910,14 +1950,6 @@ function setupEventListeners() {
         AppState.showLabels = e.target.checked;
         updateLabels();
     });
-    document.getElementById('labelFieldSelect')?.addEventListener('change', (e) => {
-        AppState.labelField = e.target.value;
-        updateLabels();
-    });
-    document.getElementById('labelStyleSelect')?.addEventListener('change', (e) => {
-        AppState.labelStyle = e.target.value;
-        updateLabels();
-    });
 
     // 11. Opacidad y Ajustes de Polígonos
     const updateOpacity = (val) => {
@@ -1943,15 +1975,54 @@ function setupEventListeners() {
         aplicarFiltros();
     });
 
-    // 12. Mapas Base
-    document.getElementById('baseMapSelect')?.addEventListener('change', (e) => {
-        const key = e.target.value;
-        if (AppState.baseLayers[key]) {
-            AppState.map.removeLayer(AppState.currentBaseLayer);
-            AppState.currentBaseLayer = AppState.baseLayers[key];
-            AppState.currentBaseLayer.addTo(AppState.map);
-            AppState.currentBaseLayer.bringToBack();
-            showToast(`Mapa base: ${e.target.options[e.target.selectedIndex].text}`, 'info');
+    // 12. Mapa Base Exclusivo en el Visor
+    const basemapToggleBtn = document.getElementById('btn-basemap-toggle');
+    const basemapPanel = document.getElementById('basemap-floating-panel');
+    const basemapCloseBtn = document.getElementById('btn-close-basemap');
+
+    basemapToggleBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (basemapPanel) {
+            const isHidden = basemapPanel.classList.toggle('hidden');
+            basemapToggleBtn.classList.toggle('active', !isHidden);
+        }
+    });
+
+    basemapCloseBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        basemapPanel?.classList.add('hidden');
+        basemapToggleBtn?.classList.remove('active');
+    });
+
+    document.querySelectorAll('.basemap-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            const key = item.getAttribute('data-map');
+            if (key && AppState.baseLayers[key]) {
+                AppState.map.removeLayer(AppState.currentBaseLayer);
+                AppState.currentBaseLayer = AppState.baseLayers[key];
+                AppState.currentBaseLayer.addTo(AppState.map);
+                AppState.currentBaseLayer.bringToBack();
+
+                document.querySelectorAll('.basemap-item').forEach(el => el.classList.remove('active'));
+                item.classList.add('active');
+
+                const title = item.querySelector('.basemap-title')?.textContent || key;
+                showToast(`Mapa base: ${title}`, 'info', 1500);
+
+                if (isMobile()) {
+                    basemapPanel?.classList.add('hidden');
+                    basemapToggleBtn?.classList.remove('active');
+                }
+            }
+        });
+    });
+
+    document.addEventListener('click', (e) => {
+        if (basemapPanel && !basemapPanel.classList.contains('hidden')) {
+            if (!basemapPanel.contains(e.target) && e.target !== basemapToggleBtn) {
+                basemapPanel.classList.add('hidden');
+                basemapToggleBtn?.classList.remove('active');
+            }
         }
     });
 
@@ -1981,9 +2052,6 @@ function setupEventListeners() {
         document.getElementById('property-modal')?.classList.add('hidden');
     });
 
-    document.getElementById('btn-open-help')?.addEventListener('click', () => {
-        document.getElementById('help-modal')?.classList.remove('hidden');
-    });
     document.getElementById('btn-close-help-modal')?.addEventListener('click', () => {
         document.getElementById('help-modal')?.classList.add('hidden');
     });
@@ -1991,6 +2059,8 @@ function setupEventListeners() {
     window.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             document.querySelectorAll('.glass-modal').forEach(m => m.classList.add('hidden'));
+            basemapPanel?.classList.add('hidden');
+            basemapToggleBtn?.classList.remove('active');
         }
     });
 
@@ -2000,21 +2070,29 @@ function setupEventListeners() {
         });
     });
 
-    // 15. Herramientas flotantes
+    // 15. Herramientas flotantes (Ultra fluido para celulares)
     document.getElementById('btn-recenter')?.addEventListener('click', () => {
-        if (AppState.geojsonLayer) {
-            AppState.map.fitBounds(AppState.geojsonLayer.getBounds(), { padding: [30, 30] });
-            showToast('Vista centrada en Subsector 1A-4.', 'info');
+        if (!AppState.geojsonLayer) return;
+
+        if (!AppState.subsectorBounds) {
+            AppState.subsectorBounds = AppState.geojsonLayer.getBounds();
         }
+
+        const isMob = isMobile();
+        AppState.map.fitBounds(AppState.subsectorBounds, {
+            padding: isMob ? [15, 15] : [30, 30],
+            maxZoom: 18,
+            animate: true,
+            duration: isMob ? 0.35 : 0.6
+        });
+        showToast('Vista centrada en Subsector 1A-4.', 'info', 1500);
     });
 
     document.getElementById('btn-toggle-labels-map')?.addEventListener('click', function() {
         AppState.showLabels = !AppState.showLabels;
-        const chk = document.getElementById('chkShowLabels');
-        if (chk) chk.checked = AppState.showLabels;
         this.classList.toggle('active', AppState.showLabels);
         updateLabels();
-        showToast(AppState.showLabels ? 'Etiquetas activadas' : 'Etiquetas desactivadas', 'info');
+        showToast(AppState.showLabels ? 'Etiquetas activadas' : 'Etiquetas desactivadas', 'info', 1500);
     });
 
     // Control de barra lateral responsive
