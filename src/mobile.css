@@ -117,8 +117,9 @@
     }
 
     .float-calibration-station {
-        left: 10px;
-        bottom: 10px;
+        left: 12px;
+        bottom: 24px;
+        z-index: 1200;
     }
 
     #map-container {

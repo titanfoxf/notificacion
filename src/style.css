@@ -594,13 +594,15 @@ select.styled-select option {
         transform: translateY(0) scale(1);
     }
 }
+
+/* ========================================================
    ESTACIÓN DE CALIBRACIÓN CARTOGRÁFICA EN "L" (ESTILO SANEAMIENTO)
    ======================================================== */
 .float-calibration-station {
     position: absolute;
     bottom: 20px;
     left: 20px;
-    z-index: 1000;
+    z-index: 1200;
     pointer-events: none;
     display: flex;
     align-items: flex-end;

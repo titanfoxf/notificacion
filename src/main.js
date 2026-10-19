@@ -1847,18 +1847,23 @@ function setupEventListeners() {
 
     // 7. CALIBRACIÓN CARTOGRÁFICA EN L CON ÍCONO DE TUERCA (ESTILO SANEAMIENTO)
     const toggleBtn = document.getElementById('toggle-l-calibration');
+    const gearToolBtn = document.getElementById('btn-gear-tool');
     const lContainer = document.getElementById('l-axes-container');
     
-    toggleBtn?.addEventListener('click', (e) => {
-        e.stopPropagation();
+    const toggleCalibration = (e) => {
+        if (e) e.stopPropagation();
         if (lContainer) {
             const isHidden = lContainer.classList.toggle('hidden');
-            toggleBtn.classList.toggle('active', !isHidden);
+            toggleBtn?.classList.toggle('active', !isHidden);
+            gearToolBtn?.classList.toggle('active', !isHidden);
             if (!isHidden) {
-                showToast('Calibración cartográfica activa (Ejes L).', 'info', 2000);
+                showToast('Ajuste Fino Cartográfico activo (Ejes L).', 'info', 2000);
             }
         }
-    });
+    };
+
+    toggleBtn?.addEventListener('click', toggleCalibration);
+    gearToolBtn?.addEventListener('click', toggleCalibration);
 
     document.getElementById('f-offset-east')?.addEventListener('input', (e) => {
         handleOffsetInput(e.target.value, AppState.offsetN);
