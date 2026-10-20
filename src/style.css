@@ -1332,5 +1332,217 @@ select.styled-select option {
     transform: none;
 }
 
+/* ========================================================
+   SISTEMA DE 3 VISITAS / NOTIFICACIONES Y FOTOS POR LOTE
+   ======================================================== */
+
+/* Selector de Pestañas de las 3 Visitas */
+.visit-tabs-container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.btn-visit-tab {
+    background: rgba(15, 23, 42, 0.7);
+    border: 1.5px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    padding: 8px 6px;
+    color: #cbd5e1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    user-select: none;
+}
+
+.btn-visit-tab:hover {
+    border-color: rgba(56, 189, 248, 0.5);
+    background: rgba(15, 23, 42, 0.9);
+}
+
+.btn-visit-tab.active {
+    border-color: #38bdf8;
+    background: rgba(56, 189, 248, 0.14);
+    box-shadow: 0 0 14px rgba(56, 189, 248, 0.3);
+    color: #ffffff;
+}
+
+.btn-visit-tab.has-record {
+    border-color: rgba(16, 185, 129, 0.5);
+}
+
+.btn-visit-tab.has-record.active {
+    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.16);
+    box-shadow: 0 0 14px rgba(16, 185, 129, 0.35);
+}
+
+.tab-badge {
+    font-size: 11px;
+    font-weight: 800;
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.15);
+    padding: 2px 7px;
+    border-radius: 6px;
+}
+
+.btn-visit-tab.has-record .tab-badge {
+    color: #34d399;
+    background: rgba(16, 185, 129, 0.2);
+}
+
+.tab-info {
+    text-align: center;
+    line-height: 1.2;
+}
+
+.tab-info strong {
+    font-size: 11px;
+    display: block;
+}
+
+.tab-info small {
+    font-size: 9px;
+    color: var(--text-dim);
+}
+
+/* Tarjetas de las 3 Visitas en la Ficha Técnica del Predio */
+.visits-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.visit-card-box {
+    background: rgba(15, 23, 42, 0.65);
+    border: 1.5px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.visit-card-box.completed {
+    border-color: rgba(16, 185, 129, 0.35);
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.visit-card-box.pending {
+    border: 1.5px dashed rgba(255, 255, 255, 0.15);
+    background: rgba(15, 23, 42, 0.35);
+}
+
+.visit-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.visit-card-thumb-wrap {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    height: 110px;
+    background: #000;
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.visit-card-thumb-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.2s ease;
+}
+
+.visit-card-thumb-wrap:hover img {
+    transform: scale(1.05);
+}
+
+.visit-card-thumb-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(0deg, rgba(0,0,0,0.75) 0%, transparent 60%);
+    display: flex;
+    align-items: flex-end;
+    padding: 6px 8px;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+/* Badge interactivo en la tabla del Dashboard */
+.btn-visit-mini {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 7px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.15s ease;
+}
+
+.btn-visit-mini.done {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+.btn-visit-mini.done:hover {
+    background: #10b981;
+    color: #0f172a;
+}
+
+.btn-visit-mini.empty {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-dim);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Lightbox Modal para ampliar foto */
+.lightbox-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    user-select: none;
+    animation: fadeInModal 0.2s ease;
+}
+
+.lightbox-content {
+    max-width: 90vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.lightbox-content img {
+    max-width: 100%;
+    max-height: 75vh;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.85);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    object-fit: contain;
+}
+
 /* Hidden Utility */
 .hidden { display: none !important; }

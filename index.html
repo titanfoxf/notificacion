@@ -376,6 +376,37 @@
                     </div>
                 </div>
 
+                <!-- Selector de Número de Visita / Notificación (1ra, 2da o 3ra) -->
+                <div class="field-section">
+                    <label class="field-label">
+                        <span>Diligencia de Campo • Seleccionar Notificación</span>
+                        <span style="font-size: 10px; color: #38bdf8; font-weight: 700;">Protocolo de 3 Visitas</span>
+                    </label>
+                    <div class="visit-tabs-container" id="visit-tabs-selector">
+                        <button type="button" class="btn-visit-tab active" data-visit="1" id="tab-visit-1">
+                            <span class="tab-badge">1°</span>
+                            <div class="tab-info">
+                                <strong>1ra Notificación</strong>
+                                <small id="tab-visit-status-1">Pendiente</small>
+                            </div>
+                        </button>
+                        <button type="button" class="btn-visit-tab" data-visit="2" id="tab-visit-2">
+                            <span class="tab-badge">2°</span>
+                            <div class="tab-info">
+                                <strong>2da Notificación</strong>
+                                <small id="tab-visit-status-2">Pendiente</small>
+                            </div>
+                        </button>
+                        <button type="button" class="btn-visit-tab" data-visit="3" id="tab-visit-3">
+                            <span class="tab-badge">3°</span>
+                            <div class="tab-info">
+                                <strong>3ra Notificación</strong>
+                                <small id="tab-visit-status-3">Pendiente</small>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
                 <!-- 1. Estado de Notificación -->
                 <div class="field-section">
                     <label class="field-label">
@@ -574,10 +605,11 @@
                                     <th style="padding: 8px;">CÓDIGO</th>
                                     <th style="padding: 8px;">ASOCIACIÓN</th>
                                     <th style="padding: 8px;">MZ/LT</th>
+                                    <th style="padding: 8px;">TITULAR</th>
+                                    <th style="padding: 8px; text-align: center;">1° NOTIF (FOTO 1)</th>
+                                    <th style="padding: 8px; text-align: center;">2° NOTIF (FOTO 2)</th>
+                                    <th style="padding: 8px; text-align: center;">3° NOTIF (FOTO 3)</th>
                                     <th style="padding: 8px;">ESTADO</th>
-                                    <th style="padding: 8px;">CARPETA</th>
-                                    <th style="padding: 8px;">TITULAR 1</th>
-                                    <th style="padding: 8px;">DNI 1</th>
                                     <th style="padding: 8px; text-align: center;">ACCIÓN</th>
                                 </tr>
                             </thead>
@@ -617,6 +649,23 @@
                     <li><strong>Doble clic:</strong> Zoom directo al predio seleccionado.</li>
                     <li><strong>Dibujar Área:</strong> Filtro espacial por polígono trazado (Ray-Casting PIP).</li>
                 </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Lightbox para Ampliar Fotos de Campo -->
+    <div id="image-lightbox-modal" class="lightbox-modal hidden">
+        <div class="lightbox-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; color: #fff;">
+                <strong id="lightbox-title" style="font-size: 14px; color: #38bdf8;">Foto de Evidencia</strong>
+                <button id="btn-close-lightbox" class="btn-close" style="font-size: 24px; cursor: pointer;">×</button>
+            </div>
+            <img id="lightbox-img" src="" alt="Foto Ampliada">
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 8px;">
+                <span id="lightbox-meta" style="font-size: 11px; color: #cbd5e1;"></span>
+                <a id="lightbox-drive-link" href="#" target="_blank" class="btn-secondary" style="font-size: 11px; padding: 4px 10px; text-decoration: none; color: #38bdf8; display: none;">
+                    Abrir en Google Drive ↗
+                </a>
             </div>
         </div>
     </div>

@@ -42,6 +42,7 @@ function doPost(e) {
 
     const data = JSON.parse(e.postData.contents);
     const codPromuvi = String(data.cod_promuvi || '').trim().toUpperCase();
+    const nroVisita = parseInt(data.nro_visita || 1, 10);
     const estadoNotif = String(data.estado_notificacion || 'NOTIFICADO').trim().toUpperCase();
     const notificador = String(data.notificador || '').trim();
     const observaciones = String(data.observaciones || '').trim();
@@ -55,12 +56,12 @@ function doPost(e) {
       return errorResponse("El código COD_PROMUVI es obligatorio.");
     }
 
-    // 1. GESTIONAR FOTO EN GOOGLE DRIVE (Si se adjuntó)
+    // 1. GESTIONAR FOTO EN GOOGLE DRIVE (Identificada por lote y número de visita)
     let urlFotoDrive = "";
     if (data.foto_base64) {
       try {
         const folder = getOrCreateFolder(NOMBRE_CARPETA_DRIVE);
-        const fileName = `${codPromuvi}_${Utilities.formatDate(fechaHora, "GMT-5", "yyyyMMdd_HHmmss")}.jpg`;
+        const fileName = `${codPromuvi}_VISITA_${nroVisita}_${Utilities.formatDate(fechaHora, "GMT-5", "yyyyMMdd_HHmmss")}.jpg`;
         const decodedBytes = Utilities.base64Decode(data.foto_base64);
         const blob = Utilities.newBlob(decodedBytes, "image/jpeg", fileName);
         const file = folder.createFile(blob);
@@ -76,7 +77,7 @@ function doPost(e) {
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     
-    // 2. ACTUALIZAR O INSERTAR EN LA HOJA PRINCIPAL DEL PADRÓN
+    // 2. ACTUALIZAR O INSERTAR EN LA HOJA PRINCIPAL DEL PADRÓN (Columnas por cada Visita 1, 2 y 3)
     let sheetPrincipal = ss.getSheetByName(NOMBRE_HOJA_PADRON) || ss.getSheets()[0];
     let rowUpdated = false;
 
@@ -85,26 +86,36 @@ function doPost(e) {
       const values = dataRange.getValues();
       const headers = values[0].map(h => String(h).trim().toUpperCase());
 
-      // Verificar y agregar columnas si no existen
+      // Verificar columna de código
       let colCod = headers.findIndex(h => h.includes('COD_PROMUVI') || h === 'CODIGO' || h === 'LOTE');
       if (colCod === -1) colCod = 0;
 
-      let colEstadoNotif = getOrAddColumn(sheetPrincipal, headers, 'ESTADO_NOTIFICACION');
-      let colFechaNotif = getOrAddColumn(sheetPrincipal, headers, 'FECHA_NOTIFICACION');
-      let colNotificador = getOrAddColumn(sheetPrincipal, headers, 'NOTIFICADOR');
-      let colObsNotif = getOrAddColumn(sheetPrincipal, headers, 'OBSERVACIONES_NOTIFICACION');
-      let colFotoDrive = getOrAddColumn(sheetPrincipal, headers, 'FOTO_DRIVE');
+      // Columnas específicas de la visita actual (1, 2 o 3)
+      let colVisitaEstado = getOrAddColumn(sheetPrincipal, headers, `VISITA_${nroVisita}_ESTADO`);
+      let colVisitaFecha = getOrAddColumn(sheetPrincipal, headers, `VISITA_${nroVisita}_FECHA`);
+      let colVisitaNotificador = getOrAddColumn(sheetPrincipal, headers, `VISITA_${nroVisita}_NOTIFICADOR`);
+      let colVisitaObs = getOrAddColumn(sheetPrincipal, headers, `VISITA_${nroVisita}_OBSERVACIONES`);
+      let colVisitaFoto = getOrAddColumn(sheetPrincipal, headers, `VISITA_${nroVisita}_FOTO_DRIVE`);
+
+      // Columnas de resumen global
+      let colUltimaVisita = getOrAddColumn(sheetPrincipal, headers, 'ULTIMA_VISITA_NUM');
+      let colEstadoFinal = getOrAddColumn(sheetPrincipal, headers, 'ESTADO_NOTIFICACION');
       let colGps = getOrAddColumn(sheetPrincipal, headers, 'GPS_CAMPO');
 
       // Buscar fila correspondiente al lote
       for (let r = 1; r < values.length; r++) {
         const rowCod = String(values[r][colCod] || '').trim().toUpperCase();
         if (rowCod === codPromuvi || normCodeGas(rowCod) === normCodeGas(codPromuvi)) {
-          sheetPrincipal.getRange(r + 1, colEstadoNotif).setValue(estadoNotif);
-          sheetPrincipal.getRange(r + 1, colFechaNotif).setValue(fechaTexto);
-          if (notificador) sheetPrincipal.getRange(r + 1, colNotificador).setValue(notificador);
-          if (observaciones) sheetPrincipal.getRange(r + 1, colObsNotif).setValue(observaciones);
-          if (urlFotoDrive) sheetPrincipal.getRange(r + 1, colFotoDrive).setValue(urlFotoDrive);
+          // Guardar datos de esta visita específica
+          sheetPrincipal.getRange(r + 1, colVisitaEstado).setValue(estadoNotif);
+          sheetPrincipal.getRange(r + 1, colVisitaFecha).setValue(fechaTexto);
+          if (notificador) sheetPrincipal.getRange(r + 1, colVisitaNotificador).setValue(notificador);
+          if (observaciones) sheetPrincipal.getRange(r + 1, colVisitaObs).setValue(observaciones);
+          if (urlFotoDrive) sheetPrincipal.getRange(r + 1, colVisitaFoto).setValue(urlFotoDrive);
+
+          // Actualizar estado general
+          sheetPrincipal.getRange(r + 1, colUltimaVisita).setValue(nroVisita);
+          sheetPrincipal.getRange(r + 1, colEstadoFinal).setValue(estadoNotif);
           if (gpsLat && gpsLng) sheetPrincipal.getRange(r + 1, colGps).setValue(`${gpsLat}, ${gpsLng} (±${gpsPrecision}m)`);
           rowUpdated = true;
           break;
@@ -119,6 +130,7 @@ function doPost(e) {
       sheetHistorial.appendRow([
         "FECHA_HORA", 
         "COD_PROMUVI", 
+        "NRO_VISITA", 
         "ESTADO_NOTIFICACION", 
         "NOTIFICADOR", 
         "OBSERVACIONES", 
@@ -127,12 +139,13 @@ function doPost(e) {
         "GPS_PRECISION_M", 
         "URL_FOTO_DRIVE"
       ]);
-      sheetHistorial.getRange(1, 1, 1, 9).setFontWeight("bold").setBackground("#0f172a").setFontColor("#38bdf8");
+      sheetHistorial.getRange(1, 1, 1, 10).setFontWeight("bold").setBackground("#0f172a").setFontColor("#38bdf8");
     }
 
     sheetHistorial.appendRow([
       fechaTexto,
       codPromuvi,
+      nroVisita,
       estadoNotif,
       notificador,
       observaciones,
@@ -145,11 +158,12 @@ function doPost(e) {
     return successResponse({
       success: true,
       cod_promuvi: codPromuvi,
+      nro_visita: nroVisita,
       estado_notificacion: estadoNotif,
       fecha_notificacion: fechaTexto,
       foto_url: urlFotoDrive,
       actualizado_en_padron: rowUpdated,
-      mensaje: `Notificación registrada correctamente para ${codPromuvi}.`
+      mensaje: `Notificación Visita ${nroVisita} registrada correctamente para ${codPromuvi}.`
     });
 
   } catch (error) {

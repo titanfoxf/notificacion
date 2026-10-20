@@ -94,6 +94,7 @@ const AppState = {
     // Recopilación en Campo (Fotos y Notificaciones a Google Drive / Sheets)
     fieldAppsScriptUrl: localStorage.getItem('field_apps_script_url') || '',
     fieldRecordsMap: new Map(), // COD_PROMUVI -> Registro de campo
+    currentVisitNumber: 1,      // 1, 2 o 3 (Protocolo de 3 visitas)
     currentFieldLotProps: null,
     capturedPhotoBase64: null,
     capturedPhotoDataUrl: null,
@@ -1050,30 +1051,79 @@ function openPropertyModal(props) {
                 </div>
             </div>
 
-            ${fieldRecord ? `
-            <div class="prop-section-card" style="border: 1.5px solid rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08);">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h4 style="color: #34d399; margin: 0;">📋 Notificación Registrada en Campo</h4>
-                    <span class="field-lot-tag" style="background: #10b981; font-size: 11px;">${fieldRecord.estado_notificacion}</span>
-                </div>
-                <div style="font-size: 11px; color: #cbd5e1; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
-                    <div>📅 Fecha: <strong style="color: #fff;">${fieldRecord.fecha_notificacion}</strong> ${fieldRecord.notificador ? `• Notificador: <strong style="color: #38bdf8;">${fieldRecord.notificador}</strong>` : ''}</div>
-                    ${fieldRecord.observaciones ? `<div>📝 Observaciones: <em>"${fieldRecord.observaciones}"</em></div>` : ''}
-                    ${fieldRecord.gps_lat ? `<div>📍 GPS: ${Number(fieldRecord.gps_lat).toFixed(5)}, ${Number(fieldRecord.gps_lng).toFixed(5)} (±${Number(fieldRecord.gps_precision || 0).toFixed(1)}m)</div>` : ''}
-                    ${fieldRecord.foto_url ? `
-                    <div style="margin-top: 6px;">
-                        <a href="${fieldRecord.foto_url}" target="_blank" style="display: inline-flex; align-items: center; gap: 4px; color: #38bdf8; font-weight: 700; text-decoration: underline;">
-                            🖼️ Ver Foto de Evidencia en Google Drive ↗
-                        </a>
+            <!-- SECCIÓN PROTOCOLO 3 VISITAS Y 3 FOTOS POR LOTE -->
+            <div class="prop-section-card" style="border: 1.5px solid rgba(56, 189, 248, 0.35); background: rgba(15, 23, 42, 0.85);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 6px;">
+                    <div>
+                        <h4 style="color: #38bdf8; margin: 0; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+                            📸 Protocolo de 3 Visitas de Notificación
+                        </h4>
+                        <small style="color: #94a3b8; font-size: 11px;">1 fotografía de evidencia obligatoria por cada visita</small>
                     </div>
-                    ` : ''}
+                    ${(() => {
+                        let totalV = 0;
+                        if (fieldRecord && fieldRecord.visitas) {
+                            if (fieldRecord.visitas[1] && (fieldRecord.visitas[1].estado || fieldRecord.visitas[1].foto_url || fieldRecord.visitas[1].foto_base64)) totalV++;
+                            if (fieldRecord.visitas[2] && (fieldRecord.visitas[2].estado || fieldRecord.visitas[2].foto_url || fieldRecord.visitas[2].foto_base64)) totalV++;
+                            if (fieldRecord.visitas[3] && (fieldRecord.visitas[3].estado || fieldRecord.visitas[3].foto_url || fieldRecord.visitas[3].foto_base64)) totalV++;
+                        } else if (fieldRecord && (fieldRecord.estado_notificacion || fieldRecord.foto_url)) {
+                            totalV = 1;
+                        }
+                        return `
+                            <span style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;">
+                                ${totalV} de 3 Visitas Realizadas
+                            </span>
+                        `;
+                    })()}
+                </div>
+
+                <div class="visits-summary-grid">
+                    ${[1, 2, 3].map(vNum => {
+                        const v = fieldRecord?.visitas ? fieldRecord.visitas[vNum] : (vNum === 1 && fieldRecord ? { estado: fieldRecord.estado_notificacion, fecha: fieldRecord.fecha_notificacion, notificador: fieldRecord.notificador, observaciones: fieldRecord.observaciones, foto_url: fieldRecord.foto_url, foto_base64: fieldRecord.foto_base64 } : null);
+                        const isDone = !!(v && (v.estado || v.foto_url || v.foto_base64));
+                        const photoSrc = v?.foto_url || (v?.foto_base64 ? `data:image/jpeg;base64,${v.foto_base64}` : null);
+                        const estadoTag = isDone ? (v.estado || 'REALIZADA') : 'PENDIENTE';
+                        const badgeColor = isDone ? 'color: #34d399; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3);' : 'color: #94a3b8; background: rgba(255,255,255,0.05); border: 1px dashed rgba(255,255,255,0.2);';
+
+                        return `
+                            <div class="visit-card-box ${isDone ? 'completed' : 'pending'}">
+                                <div class="visit-card-header">
+                                    <span style="font-weight: 800; font-size: 11px; color: ${isDone ? '#38bdf8' : '#cbd5e1'};">${vNum}° NOTIFICACIÓN</span>
+                                    <span style="font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; ${badgeColor}">${estadoTag}</span>
+                                </div>
+
+                                <div class="visit-card-body">
+                                    ${photoSrc ? `
+                                        <div class="visit-card-thumb-wrap" data-img="${photoSrc}" data-title="${cod} • ${vNum}° Notificación" data-drive="${v?.foto_url || ''}">
+                                            <img src="${photoSrc}" alt="Foto Visita ${vNum}">
+                                            <div class="visit-card-thumb-overlay">🔍 Ampliar Foto</div>
+                                        </div>
+                                    ` : `
+                                        <div class="visit-thumb-placeholder">
+                                            <span style="font-size: 20px;">📷</span>
+                                            <small style="font-size: 10px; color: var(--text-dim); text-align: center;">${isDone ? 'Sin foto adjunta' : 'Pendiente de foto'}</small>
+                                        </div>
+                                    `}
+
+                                    <div class="visit-card-info">
+                                        <div><strong>Fecha:</strong> ${isDone ? (v.fecha || '--') : 'Pendiente'}</div>
+                                        ${isDone && v.notificador ? `<div><strong>Notif:</strong> ${v.notificador}</div>` : ''}
+                                        ${isDone && v.observaciones ? `<div><strong>Obs:</strong> <em>"${v.observaciones}"</em></div>` : ''}
+                                    </div>
+                                </div>
+
+                                <button type="button" class="btn-card-visit-action ${isDone ? 'btn-secondary' : 'btn-primary'}" data-visit="${vNum}" style="width: 100%; font-size: 11px; padding: 6px; border-radius: 6px; cursor: pointer;">
+                                    ${isDone ? `✏️ Editar Visita ${vNum}` : `➕ Registrar Visita ${vNum}`}
+                                </button>
+                            </div>
+                        `;
+                    }).join('')}
                 </div>
             </div>
-            ` : ''}
 
             <div style="display: flex; gap: 10px; margin-top: 4px; flex-wrap: wrap;">
                 <button type="button" id="btn-open-field-capture" class="btn-primary" style="flex: 1.2; min-width: 180px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); font-weight: 800; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.45); display: flex; align-items: center; justify-content: center; gap: 6px; border: none; cursor: pointer;">
-                    📸 ${fieldRecord ? 'Actualizar Notificación en Campo' : 'Registrar Notificación en Campo'}
+                    📸 Gestionar Visitas y Fotos en Campo
                 </button>
                 <a href="${googleEarthWebUrl}" target="_blank" class="btn-secondary" style="flex: 0.8; min-width: 130px; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 6px;">
                     🌍 Google Earth
@@ -1085,6 +1135,25 @@ function openPropertyModal(props) {
     document.getElementById('modal-body-content').innerHTML = html;
     document.getElementById('property-modal').classList.remove('hidden');
 
+    // Wire visit action buttons
+    document.querySelectorAll('.btn-card-visit-action').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const vNum = parseInt(btn.getAttribute('data-visit'), 10);
+            document.getElementById('property-modal').classList.add('hidden');
+            openFieldCaptureModal(props, vNum);
+        });
+    });
+
+    // Wire thumbnail lightbox clicks
+    document.querySelectorAll('.visit-card-thumb-wrap').forEach(wrap => {
+        wrap.addEventListener('click', () => {
+            const imgSrc = wrap.getAttribute('data-img');
+            const title = wrap.getAttribute('data-title');
+            const driveUrl = wrap.getAttribute('data-drive');
+            openPhotoLightbox(imgSrc, title, driveUrl);
+        });
+    });
+
     document.getElementById('btn-open-field-capture')?.addEventListener('click', () => {
         document.getElementById('property-modal').classList.add('hidden');
         openFieldCaptureModal(props);
@@ -1093,13 +1162,56 @@ function openPropertyModal(props) {
 
 // ====== MOTOR DE RECOPILACIÓN EN CAMPO (FOTOS A DRIVE & SHEETS) ======
 
+function openPhotoLightbox(imgSrc, title = 'Foto de Evidencia', driveUrl = '') {
+    const modal = document.getElementById('image-lightbox-modal');
+    const img = document.getElementById('lightbox-img');
+    const titleEl = document.getElementById('lightbox-title');
+    const driveLink = document.getElementById('lightbox-drive-link');
+    if (!modal || !img) return;
+
+    img.src = imgSrc;
+    if (titleEl) titleEl.textContent = title;
+    if (driveLink) {
+        if (driveUrl && String(driveUrl).startsWith('http')) {
+            driveLink.href = driveUrl;
+            driveLink.style.display = 'inline-flex';
+        } else {
+            driveLink.style.display = 'none';
+        }
+    }
+    modal.classList.remove('hidden');
+}
+
+function closePhotoLightbox() {
+    document.getElementById('image-lightbox-modal')?.classList.add('hidden');
+}
+
 function loadLocalFieldRecords() {
     try {
         const saved = localStorage.getItem('FIELD_NOTIFICACIONES_RECORDS');
         if (saved) {
             const arr = JSON.parse(saved);
             arr.forEach(item => {
-                if (item.cod_promuvi) {
+                if (item && item.cod_promuvi) {
+                    // Migración automática a esquema de 3 visitas
+                    if (!item.visitas) {
+                        item.visitas = {
+                            1: {
+                                nro_visita: 1,
+                                estado: item.estado_notificacion || 'NOTIFICADO EN MANO',
+                                fecha: item.fecha_notificacion || '--',
+                                notificador: item.notificador || '',
+                                observaciones: item.observaciones || '',
+                                gps_lat: item.gps_lat || '',
+                                gps_lng: item.gps_lng || '',
+                                gps_precision: item.gps_precision || '',
+                                foto_base64: item.foto_base64 || '',
+                                foto_url: item.foto_url || ''
+                            },
+                            2: null,
+                            3: null
+                        };
+                    }
                     AppState.fieldRecordsMap.set(item.cod_promuvi.toUpperCase(), item);
                     AppState.fieldRecordsMap.set(normCode(item.cod_promuvi), item);
                 }
@@ -1112,6 +1224,7 @@ function loadLocalFieldRecords() {
 
 function saveLocalFieldRecord(record) {
     try {
+        if (!record || !record.cod_promuvi) return;
         AppState.fieldRecordsMap.set(record.cod_promuvi.toUpperCase(), record);
         AppState.fieldRecordsMap.set(normCode(record.cod_promuvi), record);
         const existing = JSON.parse(localStorage.getItem('FIELD_NOTIFICACIONES_RECORDS') || '[]');
@@ -1121,6 +1234,60 @@ function saveLocalFieldRecord(record) {
         localStorage.setItem('FIELD_NOTIFICACIONES_RECORDS', JSON.stringify(existing));
     } catch(e) {
         console.warn('Error al guardar registro local de campo:', e);
+    }
+}
+
+function selectVisitTab(visitNumber) {
+    AppState.currentVisitNumber = visitNumber;
+
+    // Actualizar botones de pestaña
+    document.querySelectorAll('.btn-visit-tab').forEach(tab => {
+        const vNum = parseInt(tab.getAttribute('data-visit'), 10);
+        tab.classList.toggle('active', vNum === visitNumber);
+    });
+
+    const cod = AppState.currentFieldLotProps?.COD_PROMUVI;
+    const rec = cod ? (AppState.fieldRecordsMap.get(cod.toUpperCase()) || AppState.fieldRecordsMap.get(normCode(cod))) : null;
+    const vData = rec?.visitas ? rec.visitas[visitNumber] : null;
+
+    // Actualizar título del modal
+    const modalTitle = document.getElementById('field-modal-title');
+    if (modalTitle) modalTitle.textContent = `Registro de Campo • ${visitNumber}° Notificación`;
+
+    // Cargar radio de estado
+    const targetStatus = vData?.estado || 'NOTIFICADO EN MANO';
+    const radios = document.querySelectorAll('input[name="field-status-radio"]');
+    radios.forEach(r => {
+        r.checked = (r.value === targetStatus);
+    });
+
+    // Cargar observaciones
+    const notesInput = document.getElementById('field-notes');
+    if (notesInput) notesInput.value = vData?.observaciones || '';
+
+    // Cargar foto de la visita seleccionada
+    const previewBox = document.getElementById('photo-preview-container');
+    const placeholder = document.getElementById('photo-upload-placeholder');
+    const previewImg = document.getElementById('photo-preview-img');
+    const infoText = document.getElementById('photo-file-info');
+    const camInput = document.getElementById('field-camera-input');
+    if (camInput) camInput.value = '';
+
+    if (vData && (vData.foto_url || vData.foto_base64)) {
+        AppState.capturedPhotoBase64 = vData.foto_base64 || null;
+        AppState.capturedPhotoDataUrl = vData.foto_url || (vData.foto_base64 ? `data:image/jpeg;base64,${vData.foto_base64}` : null);
+
+        if (previewImg) previewImg.src = AppState.capturedPhotoDataUrl;
+        if (infoText) {
+            infoText.textContent = vData.foto_url ? 'Foto subida a Google Drive' : 'Foto guardada en celular';
+        }
+        if (placeholder) placeholder.classList.add('hidden');
+        if (previewBox) previewBox.classList.remove('hidden');
+    } else {
+        AppState.capturedPhotoBase64 = null;
+        AppState.capturedPhotoDataUrl = null;
+        if (previewBox) previewBox.classList.add('hidden');
+        if (placeholder) placeholder.classList.remove('hidden');
     }
 }
 
@@ -1217,35 +1384,50 @@ function requestFieldGps(targetLat, targetLng) {
     );
 }
 
-function openFieldCaptureModal(props) {
+function openFieldCaptureModal(props, targetVisit = null) {
     AppState.currentFieldLotProps = props;
     const cod = props.COD_PROMUVI || 'LOTE';
     const sheetData = AppState.dbSheet.get(cod.toUpperCase()) || AppState.dbSheet.get(normCode(cod));
+    const rec = AppState.fieldRecordsMap.get(cod.toUpperCase()) || AppState.fieldRecordsMap.get(normCode(cod));
 
     document.getElementById('field-lot-code').textContent = cod;
     document.getElementById('field-lot-titular').textContent = (sheetData && sheetData.TITULAR_1) ? sheetData.TITULAR_1 : (props.ASOCIACIÓN || 'Subsector 1A-4');
     document.getElementById('field-lot-details').textContent = `Mz: ${props.MANZANA || '-'} • Lote: ${props.LOTE || '-'} • Carpeta: ${sheetData ? sheetData.NRO_CARPETA : 'SIN CARPETA'}`;
-
-    // Resetear foto
-    AppState.capturedPhotoBase64 = null;
-    AppState.capturedPhotoDataUrl = null;
-    document.getElementById('photo-preview-container').classList.add('hidden');
-    document.getElementById('photo-upload-placeholder').classList.remove('hidden');
-    const camInput = document.getElementById('field-camera-input');
-    if (camInput) camInput.value = '';
 
     // Cargar nombre de notificador guardado previamente
     const savedNotifier = localStorage.getItem('field_notifier_name') || '';
     const notifierInput = document.getElementById('field-notifier-name');
     if (notifierInput && savedNotifier) notifierInput.value = savedNotifier;
 
-    // Resetear observaciones
-    const notesInput = document.getElementById('field-notes');
-    if (notesInput) notesInput.value = '';
-
     // URL de Apps Script
     const gasInput = document.getElementById('field-gas-url');
     if (gasInput) gasInput.value = AppState.fieldAppsScriptUrl || '';
+
+    // Actualizar estados visuales de los tabs 1, 2, 3
+    for (let i = 1; i <= 3; i++) {
+        const statusEl = document.getElementById(`tab-visit-status-${i}`);
+        const v = rec?.visitas ? rec.visitas[i] : null;
+        if (statusEl) {
+            if (v && (v.estado || v.foto_url || v.foto_base64)) {
+                statusEl.textContent = '✅ Realizada';
+                statusEl.style.color = '#34d399';
+            } else {
+                statusEl.textContent = 'Pendiente';
+                statusEl.style.color = '#94a3b8';
+            }
+        }
+    }
+
+    // Determinar qué visita seleccionar
+    let chosenVisit = targetVisit;
+    if (!chosenVisit) {
+        if (!rec?.visitas || !rec.visitas[1]) chosenVisit = 1;
+        else if (!rec.visitas[2]) chosenVisit = 2;
+        else if (!rec.visitas[3]) chosenVisit = 3;
+        else chosenVisit = 1;
+    }
+
+    selectVisitTab(chosenVisit);
 
     // Obtener centroide del lote para comparar distancia GPS
     let lotLat = null, lotLng = null;
@@ -1257,7 +1439,7 @@ function openFieldCaptureModal(props) {
 
     requestFieldGps(lotLat, lotLng);
 
-    document.getElementById('field-capture-modal').classList.remove('hidden');
+    document.getElementById('field-capture-modal')?.classList.remove('hidden');
 }
 
 async function submitFieldRecord() {
@@ -1267,6 +1449,7 @@ async function submitFieldRecord() {
     }
 
     const cod = AppState.currentFieldLotProps.COD_PROMUVI;
+    const nroVisita = AppState.currentVisitNumber || 1;
     const selectedRadio = document.querySelector('input[name="field-status-radio"]:checked');
     const estado = selectedRadio ? selectedRadio.value : 'NOTIFICADO EN MANO';
     const notifier = (document.getElementById('field-notifier-name')?.value || '').trim();
@@ -1279,28 +1462,54 @@ async function submitFieldRecord() {
     const btnSubmit = document.getElementById('btn-submit-field-record');
     if (btnSubmit) {
         btnSubmit.disabled = true;
-        btnSubmit.innerHTML = '<span>⏳ Enviando a Google Drive y Sheets...</span>';
+        btnSubmit.innerHTML = `<span>⏳ Enviando Visita ${nroVisita} a Google Drive...</span>`;
     }
 
-    const record = {
-        cod_promuvi: cod,
-        estado_notificacion: estado,
-        fecha_notificacion: new Date().toLocaleString('es-PE'),
+    let record = AppState.fieldRecordsMap.get(cod.toUpperCase()) || AppState.fieldRecordsMap.get(normCode(cod));
+    if (!record) {
+        record = {
+            cod_promuvi: cod,
+            visitas: { 1: null, 2: null, 3: null }
+        };
+    }
+    if (!record.visitas) record.visitas = { 1: null, 2: null, 3: null };
+
+    const previousVisitData = record.visitas[nroVisita] || {};
+
+    const visitData = {
+        nro_visita: nroVisita,
+        estado: estado,
+        fecha: new Date().toLocaleString('es-PE'),
         notificador: notifier,
         observaciones: notes,
-        gps_lat: AppState.currentFieldGps ? AppState.currentFieldGps.lat : '',
-        gps_lng: AppState.currentFieldGps ? AppState.currentFieldGps.lng : '',
-        gps_precision: AppState.currentFieldGps ? AppState.currentFieldGps.accuracy : '',
-        foto_base64: AppState.capturedPhotoBase64 || '',
-        foto_url: ''
+        gps_lat: AppState.currentFieldGps ? AppState.currentFieldGps.lat : (previousVisitData.gps_lat || ''),
+        gps_lng: AppState.currentFieldGps ? AppState.currentFieldGps.lng : (previousVisitData.gps_lng || ''),
+        gps_precision: AppState.currentFieldGps ? AppState.currentFieldGps.accuracy : (previousVisitData.gps_precision || ''),
+        foto_base64: AppState.capturedPhotoBase64 || previousVisitData.foto_base64 || '',
+        foto_url: previousVisitData.foto_url || ''
     };
+
+    record.visitas[nroVisita] = visitData;
 
     // 1. Guardar copia local de inmediato
     saveLocalFieldRecord(record);
 
     // 2. Si hay URL de Google Apps Script, enviar vía POST
     if (AppState.fieldAppsScriptUrl) {
-        let sentOk = false;
+        const payload = {
+            cod_promuvi: cod,
+            nro_visita: nroVisita,
+            estado_notificacion: estado,
+            fecha_notificacion: visitData.fecha,
+            notificador: notifier,
+            observaciones: notes,
+            gps_lat: visitData.gps_lat,
+            gps_lng: visitData.gps_lng,
+            gps_precision: visitData.gps_precision,
+            foto_base64: AppState.capturedPhotoBase64 || '',
+            foto_url: visitData.foto_url || ''
+        };
+
         try {
             // Intento 1: Fetch estándar CORS con redirección automática
             const resp = await fetch(AppState.fieldAppsScriptUrl, {
@@ -1308,40 +1517,38 @@ async function submitFieldRecord() {
                 mode: 'cors',
                 redirect: 'follow',
                 headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify(record)
+                body: JSON.stringify(payload)
             });
 
             if (resp.ok) {
                 const resJson = await resp.json();
                 if (resJson && resJson.foto_url) {
-                    record.foto_url = resJson.foto_url;
+                    record.visitas[nroVisita].foto_url = resJson.foto_url;
                     saveLocalFieldRecord(record);
                 }
-                sentOk = true;
-                showToast(`✅ Notificación y foto subidas a Google Drive con éxito (${cod}).`, 'success', 5000);
+                showToast(`✅ Visita ${nroVisita} y foto guardadas en Google Drive (${cod}).`, 'success', 5000);
             } else {
                 throw new Error(`HTTP ${resp.status}`);
             }
         } catch (corsErr) {
-            console.warn('Fallo intento CORS estándar, probando envío resiliente por modo no-cors...', corsErr);
+            console.warn('Fallo intento CORS estándar, probando modo no-cors...', corsErr);
             try {
-                // Intento 2: Fallback resiliente con mode 'no-cors' (Google Apps Script procesa y guarda la foto en Drive y Sheets)
+                // Intento 2: Fallback resiliente con mode 'no-cors'
                 await fetch(AppState.fieldAppsScriptUrl, {
                     method: 'POST',
                     mode: 'no-cors',
                     redirect: 'follow',
                     headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify(record)
+                    body: JSON.stringify(payload)
                 });
-                sentOk = true;
-                showToast(`✅ Notificación y foto enviadas a Google Drive y Sheets (${cod}).`, 'success', 5000);
+                showToast(`✅ Visita ${nroVisita} y foto enviadas a Google Drive y Sheets (${cod}).`, 'success', 5000);
             } catch (fallbackErr) {
                 console.error('Error total en el envío:', fallbackErr);
                 showToast(`⚠️ Guardado en celular. Al reconectar se subirá a Drive: ${corsErr.message}`, 'warning', 6000);
             }
         }
     } else {
-        showToast(`✅ Notificación guardada en el dispositivo (${cod}). Pega la URL de Apps Script para subida directa a Drive.`, 'info', 6000);
+        showToast(`✅ Visita ${nroVisita} guardada en el dispositivo (${cod}). Pega la URL de Apps Script para subida a Drive.`, 'info', 6000);
     }
 
     if (btnSubmit) {
@@ -1353,7 +1560,7 @@ async function submitFieldRecord() {
 
     // Refrescar modal de lote para mostrar la nueva información
     openPropertyModal(AppState.currentFieldLotProps);
-    showToast(`Estado de ${cod} actualizado a: ${estado}`, 'success');
+    showToast(`Visita ${nroVisita} de ${cod} registrada como: ${estado}`, 'success');
 }
 
 /**
@@ -1404,6 +1611,21 @@ function locateUserOnMap() {
 
 // ====== DASHBOARD DE MÉTRICAS & PADRÓN ======
 
+function findFeaturePropsByCode(code) {
+    if (!code || !AppState.geojsonLayer) return null;
+    const targetNorm = normCode(code);
+    const targetClean = code.trim().toUpperCase();
+    let found = null;
+    AppState.geojsonLayer.eachLayer(layer => {
+        if (found) return;
+        const p = layer.feature?.properties;
+        if (p && ((p.COD_PROMUVI || '').toUpperCase() === targetClean || normCode(p.COD_PROMUVI) === targetNorm)) {
+            found = p;
+        }
+    });
+    return found;
+}
+
 function renderDashboard() {
     const totalPredios = 311;
     const totalNotificar = AppState.rawSheetRows.length; // 77
@@ -1411,6 +1633,10 @@ function renderDashboard() {
     let sinCarpetaCount = 0;
     let noTituladoCount = 0;
     let conDniCount = 0;
+    let v1Count = 0;
+    let v2Count = 0;
+    let v3Count = 0;
+    let totalFotosCount = 0;
     const asocCount = {};
 
     AppState.rawSheetRows.forEach(r => {
@@ -1420,6 +1646,26 @@ function renderDashboard() {
 
         const asoc = r.ASOCIACION || 'OTRA';
         asocCount[asoc] = (asocCount[asoc] || 0) + 1;
+
+        const cod = r.COD_PROMUVI;
+        const rec = AppState.fieldRecordsMap.get(cod.toUpperCase()) || AppState.fieldRecordsMap.get(normCode(cod));
+        if (rec && rec.visitas) {
+            if (rec.visitas[1] && (rec.visitas[1].estado || rec.visitas[1].foto_url || rec.visitas[1].foto_base64)) {
+                v1Count++;
+                if (rec.visitas[1].foto_url || rec.visitas[1].foto_base64) totalFotosCount++;
+            }
+            if (rec.visitas[2] && (rec.visitas[2].estado || rec.visitas[2].foto_url || rec.visitas[2].foto_base64)) {
+                v2Count++;
+                if (rec.visitas[2].foto_url || rec.visitas[2].foto_base64) totalFotosCount++;
+            }
+            if (rec.visitas[3] && (rec.visitas[3].estado || rec.visitas[3].foto_url || rec.visitas[3].foto_base64)) {
+                v3Count++;
+                if (rec.visitas[3].foto_url || rec.visitas[3].foto_base64) totalFotosCount++;
+            }
+        } else if (rec && (rec.estado_notificacion || rec.foto_url)) {
+            v1Count++;
+            if (rec.foto_url || rec.foto_base64) totalFotosCount++;
+        }
     });
 
     const kpiContainer = document.getElementById('dashboard-kpis');
@@ -1430,25 +1676,35 @@ function renderDashboard() {
                 <span class="metric-title">En Padrón Notificar</span>
                 <span class="metric-sub">${((totalNotificar/totalPredios)*100).toFixed(1)}% del Subsector 1A-4</span>
             </div>
+            <div class="metric-card emerald">
+                <span class="metric-number">${v1Count} / ${totalNotificar}</span>
+                <span class="metric-title">1° Notificaciones</span>
+                <span class="metric-sub">${((v1Count/totalNotificar)*100).toFixed(0)}% de avance de 1ra visita</span>
+            </div>
+            <div class="metric-card emerald">
+                <span class="metric-number">${v2Count} / ${totalNotificar}</span>
+                <span class="metric-title">2° Notificaciones</span>
+                <span class="metric-sub">${((v2Count/totalNotificar)*100).toFixed(0)}% de avance de 2da visita</span>
+            </div>
+            <div class="metric-card emerald">
+                <span class="metric-number">${v3Count} / ${totalNotificar}</span>
+                <span class="metric-title">3° Notificaciones</span>
+                <span class="metric-sub">${((v3Count/totalNotificar)*100).toFixed(0)}% de avance de 3ra visita</span>
+            </div>
+            <div class="metric-card pink">
+                <span class="metric-number">${totalFotosCount}</span>
+                <span class="metric-title">Fotos de Evidencia</span>
+                <span class="metric-sub">Evidencias en Google Drive</span>
+            </div>
             <div class="metric-card amber">
                 <span class="metric-number">${sinCarpetaCount}</span>
                 <span class="metric-title">Sin Carpeta</span>
-                <span class="metric-sub">Requiere apertura (${((sinCarpetaCount/totalNotificar)*100).toFixed(1)}%)</span>
-            </div>
-            <div class="metric-card pink">
-                <span class="metric-number">${noTituladoCount}</span>
-                <span class="metric-title">No Titulados</span>
-                <span class="metric-sub">Con expediente en trámite (${((noTituladoCount/totalNotificar)*100).toFixed(1)}%)</span>
-            </div>
-            <div class="metric-card emerald">
-                <span class="metric-number">${conDniCount}</span>
-                <span class="metric-title">Titular Identificado</span>
-                <span class="metric-sub">Con DNI registrado en hoja</span>
+                <span class="metric-sub">${((sinCarpetaCount/totalNotificar)*100).toFixed(1)}% del padrón</span>
             </div>
             <div class="metric-card slate">
-                <span class="metric-number">${totalPredios}</span>
-                <span class="metric-title">Total Sector 1A-4</span>
-                <span class="metric-sub">Polígonos catastrales totales</span>
+                <span class="metric-number">${noTituladoCount}</span>
+                <span class="metric-title">No Titulados</span>
+                <span class="metric-sub">${((noTituladoCount/totalNotificar)*100).toFixed(1)}% del padrón</span>
             </div>
         `;
     }
@@ -1523,26 +1779,57 @@ function renderDashboardTable(rows) {
     if (!tbody) return;
 
     if (!rows || rows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 20px; color: var(--text-muted);">Sin resultados.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding: 20px; color: var(--text-muted);">Sin resultados.</td></tr>`;
         return;
     }
 
     let trs = '';
     rows.forEach(r => {
-        const isSinCarpeta = r.ESTADO.includes('SIN CARPETA');
+        const cod = r.COD_PROMUVI || '';
+        const rec = AppState.fieldRecordsMap.get(cod.toUpperCase()) || AppState.fieldRecordsMap.get(normCode(cod));
+        const v1 = rec?.visitas ? rec.visitas[1] : (rec ? { estado: rec.estado_notificacion, fecha: rec.fecha_notificacion, notificador: rec.notificador, observaciones: rec.observaciones, foto_url: rec.foto_url, foto_base64: rec.foto_base64 } : null);
+        const v2 = rec?.visitas ? rec.visitas[2] : null;
+        const v3 = rec?.visitas ? rec.visitas[3] : null;
+
+        const isSinCarpeta = (r.ESTADO || '').includes('SIN CARPETA');
         const badgeCol = isSinCarpeta ? 'color: #f59e0b; background: rgba(245,158,11,0.15);' : 'color: #ec4899; background: rgba(236,72,153,0.15);';
+
+        const renderVisitCell = (v, vNum) => {
+            if (v && (v.estado || v.foto_url || v.foto_base64)) {
+                const hasPhoto = !!(v.foto_url || v.foto_base64);
+                const shortStatus = (v.estado || 'REALIZADA').substring(0, 10);
+                return `
+                    <button type="button" class="btn-visit-mini completed btn-table-visit-photo" 
+                            data-cod="${cod}" 
+                            data-visit="${vNum}"
+                            data-has-photo="${hasPhoto ? '1' : '0'}"
+                            title="${v.estado} • ${v.fecha || ''}">
+                        ${hasPhoto ? '📸' : '📝'} ${shortStatus}
+                    </button>
+                `;
+            }
+            return `
+                <button type="button" class="btn-visit-mini pending btn-table-visit-add" 
+                        data-cod="${cod}" 
+                        data-visit="${vNum}">
+                    + Visita ${vNum}
+                </button>
+            `;
+        };
 
         trs += `
             <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
-                <td style="padding: 8px; font-weight: 700; color: #38bdf8;">${r.COD_PROMUVI}</td>
+                <td style="padding: 8px; font-weight: 700; color: #38bdf8;">${cod}</td>
                 <td style="padding: 8px;">${r.ASOCIACION || '--'}</td>
                 <td style="padding: 8px;">${r.MANZANA || '-'}-${r.LOTE || '-'}</td>
-                <td style="padding: 8px;"><span style="padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; ${badgeCol}">${r.ESTADO}</span></td>
-                <td style="padding: 8px; font-family: monospace;">${r.NRO_CARPETA || '--'}</td>
                 <td style="padding: 8px;">${r.TITULAR_1 || '--'}</td>
-                <td style="padding: 8px; font-family: monospace;">${r.DNI_1 || '--'}</td>
-                <td style="padding: 8px; text-align: center;">
-                    <button class="btn-locate-row btn-secondary" data-cod="${r.COD_PROMUVI}" style="padding: 2px 8px; font-size: 10px;">Ver 🔍</button>
+                <td style="padding: 6px; text-align: center;">${renderVisitCell(v1, 1)}</td>
+                <td style="padding: 6px; text-align: center;">${renderVisitCell(v2, 2)}</td>
+                <td style="padding: 6px; text-align: center;">${renderVisitCell(v3, 3)}</td>
+                <td style="padding: 8px;"><span style="padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; ${badgeCol}">${r.ESTADO || '--'}</span></td>
+                <td style="padding: 8px; text-align: center; white-space: nowrap;">
+                    <button type="button" class="btn-locate-row btn-secondary" data-cod="${cod}" style="padding: 3px 7px; font-size: 10px; margin-right: 4px;" title="Ver en mapa">📍 Mapa</button>
+                    <button type="button" class="btn-prop-row btn-secondary" data-cod="${cod}" style="padding: 3px 7px; font-size: 10px; color: #38bdf8;" title="Ver Ficha y Fotos">📋 Ficha</button>
                 </td>
             </tr>
         `;
@@ -1550,11 +1837,54 @@ function renderDashboardTable(rows) {
 
     tbody.innerHTML = trs;
 
+    // Wire table button events
     tbody.querySelectorAll('.btn-locate-row').forEach(btn => {
         btn.addEventListener('click', () => {
             const cod = btn.getAttribute('data-cod');
             document.getElementById('dashboard-modal')?.classList.add('hidden');
             locateFeatureByCode(cod);
+        });
+    });
+
+    tbody.querySelectorAll('.btn-prop-row').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const cod = btn.getAttribute('data-cod');
+            const target = findFeaturePropsByCode(cod);
+            if (target) {
+                document.getElementById('dashboard-modal')?.classList.add('hidden');
+                openPropertyModal(target);
+            }
+        });
+    });
+
+    tbody.querySelectorAll('.btn-table-visit-photo').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const cod = btn.getAttribute('data-cod');
+            const vNum = parseInt(btn.getAttribute('data-visit'), 10);
+            const rec = AppState.fieldRecordsMap.get(cod.toUpperCase()) || AppState.fieldRecordsMap.get(normCode(cod));
+            const v = rec?.visitas ? rec.visitas[vNum] : null;
+            if (v && (v.foto_url || v.foto_base64)) {
+                const src = v.foto_url || `data:image/jpeg;base64,${v.foto_base64}`;
+                openPhotoLightbox(src, `${cod} • Notificación N° ${vNum} (${v.estado})`, v.foto_url);
+            } else {
+                const target = findFeaturePropsByCode(cod);
+                if (target) {
+                    document.getElementById('dashboard-modal')?.classList.add('hidden');
+                    openFieldCaptureModal(target, vNum);
+                }
+            }
+        });
+    });
+
+    tbody.querySelectorAll('.btn-table-visit-add').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const cod = btn.getAttribute('data-cod');
+            const vNum = parseInt(btn.getAttribute('data-visit'), 10);
+            const target = findFeaturePropsByCode(cod);
+            if (target) {
+                document.getElementById('dashboard-modal')?.classList.add('hidden');
+                openFieldCaptureModal(target, vNum);
+            }
         });
     });
 }
@@ -2194,13 +2524,29 @@ function setupEventListeners() {
     });
 
     document.getElementById('btn-download-table-excel')?.addEventListener('click', () => {
-        const excelArray = generateExcelWorkbook(AppState.visibleLayers);
+        const excelArray = generateExcelWorkbook(AppState.visibleLayers, AppState.fieldRecordsMap);
         const blob = new Blob([excelArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         downloadFile(blob, `Padron_Notificaciones_${Date.now()}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     });
 
-    // 17. Recopilación de Campo (Fotos, GPS, Estados)
+    // 17. Recopilación de Campo (Fotos, GPS, Estados y 3 Visitas)
     document.getElementById('btn-gps-locate')?.addEventListener('click', locateUserOnMap);
+
+    // Selector de pestañas de visitas (1ra, 2da, 3ra)
+    document.querySelectorAll('.btn-visit-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const vNum = parseInt(tab.getAttribute('data-visit'), 10);
+            if (vNum >= 1 && vNum <= 3) {
+                selectVisitTab(vNum);
+            }
+        });
+    });
+
+    // Lightbox para ver fotos de evidencias en pantalla completa
+    document.getElementById('btn-close-lightbox')?.addEventListener('click', closePhotoLightbox);
+    document.getElementById('image-lightbox-modal')?.addEventListener('click', (e) => {
+        if (e.target.id === 'image-lightbox-modal') closePhotoLightbox();
+    });
 
     // Abrir selector de cámara al tocar el dropzone
     const photoPlaceholder = document.getElementById('photo-upload-placeholder');

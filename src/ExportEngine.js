@@ -262,7 +262,7 @@ export function generateKML(layers, options = {}) {
 /**
  * Generates an Excel Workbook (.xlsx) with two sheets: Predios and Coordenadas UTM.
  */
-export function generateExcelWorkbook(layers) {
+export function generateExcelWorkbook(layers, fieldRecordsMap = null) {
     if (!layers || layers.length === 0) return null;
 
     const rowsPredios = [];
@@ -343,11 +343,41 @@ export function generateExcelWorkbook(layers) {
             });
         });
 
+        // Resolve 3 notification visits for this lot
+        const rec = fieldRecordsMap ? fieldRecordsMap.get(cod) : null;
+        const v1 = rec && rec.visitas ? rec.visitas[1] : (rec ? { estado: rec.estado_notificacion, fecha: rec.fecha, notificador: rec.notificador, observaciones: rec.observaciones, foto_drive_url: rec.foto_drive_url, foto_base64: rec.foto_base64 } : null);
+        const v2 = rec && rec.visitas ? rec.visitas[2] : null;
+        const v3 = rec && rec.visitas ? rec.visitas[3] : null;
+
+        let totalVisitas = 0;
+        if (v1 && (v1.estado || v1.foto_drive_url || v1.foto_url || v1.foto_base64)) totalVisitas++;
+        if (v2 && (v2.estado || v2.foto_drive_url || v2.foto_url || v2.foto_base64)) totalVisitas++;
+        if (v3 && (v3.estado || v3.foto_drive_url || v3.foto_url || v3.foto_base64)) totalVisitas++;
+
+        const estadoFinal = (v3 && v3.estado) || (v2 && v2.estado) || (v1 && v1.estado) || props.ESTADO || "PENDIENTE";
+
         // Add record to main summary sheet
         rowsPredios.push({
             "ITEM": idx + 1,
             "COD_PROMUVI": cod,
-            "ESTADO_NOTIFICACION": props.ESTADO || "NO PRIORIZADO",
+            "ESTADO_SISTEMA": props.ESTADO || "NO PRIORIZADO",
+            "TOTAL_VISITAS_CAMPO": totalVisitas,
+            "ESTADO_CAMPO_FINAL": estadoFinal,
+            "1RA_VISITA_ESTADO": v1?.estado || "--",
+            "1RA_VISITA_FECHA": v1?.fecha || "--",
+            "1RA_VISITA_NOTIFICADOR": v1?.notificador || "--",
+            "1RA_VISITA_OBS": v1?.observaciones || "--",
+            "1RA_VISITA_FOTO_URL": v1?.foto_drive_url || v1?.foto_url || (v1?.foto_base64 ? "FOTO_REGISTRADA_LOCAL" : "--"),
+            "2DA_VISITA_ESTADO": v2?.estado || "--",
+            "2DA_VISITA_FECHA": v2?.fecha || "--",
+            "2DA_VISITA_NOTIFICADOR": v2?.notificador || "--",
+            "2DA_VISITA_OBS": v2?.observaciones || "--",
+            "2DA_VISITA_FOTO_URL": v2?.foto_drive_url || v2?.foto_url || (v2?.foto_base64 ? "FOTO_REGISTRADA_LOCAL" : "--"),
+            "3RA_VISITA_ESTADO": v3?.estado || "--",
+            "3RA_VISITA_FECHA": v3?.fecha || "--",
+            "3RA_VISITA_NOTIFICADOR": v3?.notificador || "--",
+            "3RA_VISITA_OBS": v3?.observaciones || "--",
+            "3RA_VISITA_FOTO_URL": v3?.foto_drive_url || v3?.foto_url || (v3?.foto_base64 ? "FOTO_REGISTRADA_LOCAL" : "--"),
             "ASOCIACION": props.ASOCIACIÓN || props.ASOCIACION || "--",
             "MANZANA": props.MANZANA || "--",
             "LOTE": props.LOTE || "--",
